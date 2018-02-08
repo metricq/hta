@@ -4,11 +4,15 @@ cmake_minimum_required(VERSION 3.8)
 
 set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
+add_subdirectory(lib/catch)
 add_subdirectory(lib/json)
 
 set(hta_VERSION 0.0)
 
-set(SRCS src/main.cpp)
+set(SRCS
+        src/aggregate.cpp src/directory.cpp src/metric.cpp
+        src/storage/file/directory.cpp src/storage/file/metric.cpp
+        )
 
 add_library(hta ${SRCS})
 target_include_directories(hta
@@ -17,9 +21,14 @@ target_include_directories(hta
         $<INSTALL_INTERFACE:include>
         )
 
+# TODO wait for gcc 8
+# No, there is no feature test for filesystem
+# and no, CMake doesn't help one bit with this shit
+# gcc 8 will have this working just fine, then we can also remove my_filesystem.hpp
 target_link_libraries(hta
         PRIVATE
         json::json
+        stdc++fs
         )
 
 target_compile_features(hta PUBLIC cxx_std_17)
@@ -57,8 +66,8 @@ if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
             DESTINATION lib/cmake/hta
             )
 
-    # include(CTest)
-    # add_subdirectory(tests)
+    include(CTest)
+    add_subdirectory(tests)
 else()
     set_target_properties(hta PROPERTIES EXCLUDE_FROM_ALL TRUE)
 endif()

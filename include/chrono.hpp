@@ -13,12 +13,16 @@ struct Clock
     using duration = Duration;
     using rep = duration::rep;
     using period = duration::period;
-    //using time_point = std::chrono::time_point<Clock>;
+    // using time_point = std::chrono::time_point<Clock>;
 
     // Default constructor creates an "Invalid" timestamp that evaluates to false
-    struct time_point : std::chrono::time_point<Clock> {
+    struct time_point : std::chrono::time_point<Clock>
+    {
         using base = std::chrono::time_point<Clock>;
         using base::base;
+        time_point(const base& x) : base(x)
+        {
+        }
 
         operator bool() const
         {
