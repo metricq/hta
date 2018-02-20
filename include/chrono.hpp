@@ -20,7 +20,7 @@ struct Clock
     {
         using base = std::chrono::time_point<Clock>;
         using base::base;
-        time_point(const base& x) : base(x)
+        constexpr time_point(const base& x) : base(x)
         {
         }
 

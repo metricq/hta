@@ -52,10 +52,12 @@ void Metric::insert(TimeValue tv)
     auto& level = levels_[interval];
     if (!level.time_current)
     {
-        level.time_current = interval_begin(tv.time, interval);
+        // level.time_current = interval_begin(tv.time, interval);
+        level.time_current = tv.time;
     }
     auto level_time_end = interval_end(level.time_current, interval);
-    if (tv.time >= level_time_end)
+
+    while (tv.time >= level_time_end)
     {
         // the point doesn't belong in the current interval,
         // but some of it's integral may..
@@ -65,7 +67,7 @@ void Metric::insert(TimeValue tv)
         Aggregate partial_interval{
             tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
         };
-        level.advance({ tv.time, partial_interval });
+        level.advance({ level_time_end, partial_interval });
 
         auto level_time_begin = level_time_end - interval;
 
@@ -74,11 +76,7 @@ void Metric::insert(TimeValue tv)
 
         // reset the interval at lowest level
         level = Level(level_time_end);
-
-        // Try to add it again
-        // TODO make this tail recursive to avoid stack overflow
-        insert(tv);
-        return;
+        level_time_end = interval_end(level.time_current, interval);
     }
     level.advance(tv);
 }
@@ -87,18 +85,22 @@ void Metric::insert(Row row)
 {
     storage_metric_->insert(row);
 
-    const auto interval = row.interval;
-    auto& level = levels_[row.interval];
+    const auto interval = row.interval * interval_factor_;
+    auto& level = levels_[interval];
     if (!level.time_current)
     {
-        level.time_current = interval_begin(row.time, interval);
+        level.time_current = row.end_time();
     }
-    auto level_time_end = interval_end(level.time_current, row.interval);
-    if (row.time >= level_time_end)
+    else
+    {
+        assert(level.time_current == row.time);
+    }
+    auto level_time_end = interval_end(level.time_current, interval);
+    if (row.end_time() >= level_time_end)
     {
         // the new row from below completes the interval at current level
         // Small intervals should never cross through multiple larger ones
-        assert(row.time == level_time_end);
+        assert(row.end_time() == level_time_end);
         // Close the interval and make a new one
         level.advance({ level_time_end, row.aggregate });
 
@@ -109,13 +111,10 @@ void Metric::insert(Row row)
 
         // reset the interval at current level
         level = Level(level_time_end);
-        // recurse to gracefully handle current_ts being multiple intervals behind
-        // TODO avoid stackoverflow...
-        insert(row);
         return;
     }
 
-    level.advance({ row.time, row.aggregate });
+    level.advance({ row.end_time(), row.aggregate });
 }
 
 std::vector<TimeAggregate> Metric::retrieve_raw(TimePoint begin, TimePoint end, IntervalScope scope)
@@ -125,7 +124,7 @@ std::vector<TimeAggregate> Metric::retrieve_raw(TimePoint begin, TimePoint end, 
     result.reserve(result_tv.size());
     for (auto tv : result_tv)
     {
-        result.push_back({tv.time, Aggregate(tv.value)});
+        result.push_back({ tv.time, Aggregate(tv.value) });
     }
     return result;
 }

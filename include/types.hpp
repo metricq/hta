@@ -68,6 +68,10 @@ struct Row
     Duration interval;
     TimePoint time;
     Aggregate aggregate;
+    TimePoint end_time() const
+    {
+        return time + interval;
+    }
 };
 
 enum class IntervalScope

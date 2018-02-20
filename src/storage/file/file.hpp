@@ -123,7 +123,18 @@ private:
     void read(std::vector<T>& vec)
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be a POD.");
+        stream_.exceptions(std::ios::badbit);
         stream_.read(reinterpret_cast<char*>(vec.data()), sizeof(T) * vec.size());
+        if (stream_.eof())
+        {
+            // how much did we actually read...
+            auto count = stream_.gcount();
+            assert(0 == count % sizeof(T));
+            assert(count / sizeof(T) <= vec.size());
+            vec.resize(count / sizeof(T));
+            stream_.clear();
+        }
+        stream_.exceptions(std::ios::badbit | std::ios::failbit);
     }
 
     void write_preamble(const HeaderType& header)

@@ -124,9 +124,9 @@ std::vector<TimeAggregate> Metric::get(TimePoint t0, TimePoint t1, Duration inte
 
     uint64_t i0 = d0 / interval;
     uint64_t i1 = d1 / interval + 1; // @TODO extended?!
-    size_t count = i1 - i0;
 
     i1 = std::min(size(), i1);
+    size_t count = i1 - i0;
 
     std::vector<TimeAggregate> result(count);
     file.read(result, i0 * sizeof(TimeAggregate));
