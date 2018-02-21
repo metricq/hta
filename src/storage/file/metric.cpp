@@ -100,7 +100,7 @@ TimePoint Metric::epoch()
 
 TimePoint Metric::epoch(Duration interval)
 {
-    interval_begin(epoch(), interval);
+    return interval_begin(epoch(), interval);
 }
 
 std::vector<TimeAggregate> Metric::get(TimePoint t0, TimePoint t1, Duration interval,
