@@ -18,10 +18,8 @@ if(NOT HAS_STD_FILESYSTEM)
         message(SEND_ERROR "Cannot find std::filesystem, but it is required. Please use a fully C++17 compliant compiler.")
     else()
         set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_EXPERIMENTAL_STD_FILESYSTEM)
-        if(${CMAKE_CXX_COMPILER_ID} STREQUAL GNU)
-            # gcc needs an extra lib for filesystem
-            set_target_properties(std::filesystem PROPERTIES INTERFACE_LINK_LIBRARIES stdc++fs)
-        endif()
+        # libstdc++ needs an extra lib for filesystem
+        set_target_properties(std::filesystem PROPERTIES INTERFACE_LINK_LIBRARIES stdc++fs)
     endif()
 else()
     set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_STD_FILESYSTEM)
