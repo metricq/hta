@@ -12,12 +12,12 @@ using Value = double;
 struct TimeValue
 {
     TimeValue() = default;
-    TimeValue(TimePoint t, Value v) : time(t), value(v){};
+    constexpr TimeValue(TimePoint t, Value v) : time(t), value(v){};
     TimePoint time;
     Value value;
 };
 
-inline bool operator==(TimeValue left, TimeValue right)
+constexpr inline bool operator==(TimeValue left, TimeValue right)
 {
     return left.time == right.time && left.value == right.value;
 }
