@@ -35,9 +35,8 @@ class File
 {
 private:
     // NEVER EVER CHANGE THESE TWO LINES
-    static constexpr std::array<unsigned char, 8> magic_bytes = {
-        'H', 'T', 'A', 0x1a, 0xc5, 0x2c, 0xcc, 0x1d
-    };
+    static constexpr std::array<char, 8> magic_bytes = { 'H',        'T',  'A',        0x1a,
+                                                         char(0xc5), 0x2c, char(0xcc), 0x1d };
     static constexpr uint64_t byte_order_mark = 0xf8f9fafbfcfdfeff;
     static_assert(std::is_pod_v<HeaderType>, "HeaderType must be a POD.");
 
@@ -48,6 +47,8 @@ private:
     }
 
 public:
+    using pos_type = std::fstream::pos_type;
+
     File(FileOpenTag::Create, const std::filesystem::path& filename, const HeaderType& header)
     : File(filename, std::ios_base::trunc | std::ios_base::out)
     {
@@ -80,7 +81,7 @@ public:
     HeaderType read_header()
     {
         HeaderType header;
-        auto read_size = std::min(sizeof(header), data_begin_ - header_begin_);
+        auto read_size = std::min<size_t>(sizeof(header), data_begin_ - header_begin_);
         stream_.seekg(header_begin_);
         stream_.read(reinterpret_cast<char*>(&header), read_size);
         return header;
@@ -94,7 +95,7 @@ public:
     }
 
     template <typename T>
-    void read(T& thing, size_t pos)
+    void read(T& thing, pos_type pos)
     {
         stream_.seekg(data_begin_ + pos);
         read(thing);
@@ -179,6 +180,6 @@ private:
         magic_bytes.size() + sizeof(byte_order_mark) + sizeof(uint64_t);
     // Currently unsupported by code, but used in file format for future use
     static constexpr uint64_t alignment_ = 1;
-    std::size_t data_begin_;
+    pos_type data_begin_;
 };
 }
