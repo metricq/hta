@@ -35,7 +35,7 @@ class File
 {
 private:
     // NEVER EVER CHANGE THESE TWO LINES
-    static constexpr std::array<char, 8> magic_bytes = {
+    static constexpr std::array<unsigned char, 8> magic_bytes = {
         'H', 'T', 'A', 0x1a, 0xc5, 0x2c, 0xcc, 0x1d
     };
     static constexpr uint64_t byte_order_mark = 0xf8f9fafbfcfdfeff;
