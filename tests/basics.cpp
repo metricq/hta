@@ -1,12 +1,11 @@
-#include <directory.hpp>
-#include <metric.hpp>
+#include <hta/directory.hpp>
+#include <hta/metric.hpp>
+#include <hta/my_filesystem.hpp>
 
 #define CATCH_CONFIG_MAIN
 #include <catch/catch.hpp>
 
 #include <nlohmann/json.hpp>
-
-#include <my_filesystem.hpp>
 
 #include <iostream>
 using json = nlohmann::json;

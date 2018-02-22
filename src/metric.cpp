@@ -1,6 +1,6 @@
 #include "storage/metric.hpp"
 
-#include <metric.hpp>
+#include <hta/metric.hpp>
 
 #include <cassert>
 #include <iostream>

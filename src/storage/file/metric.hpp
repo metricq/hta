@@ -4,12 +4,10 @@
 
 #include "../metric.hpp"
 
-#include <exception.hpp>
-
-#include <chrono.hpp>
-#include <types.hpp>
-
-#include <my_filesystem.hpp>
+#include <hta/chrono.hpp>
+#include <hta/exception.hpp>
+#include <hta/my_filesystem.hpp>
+#include <hta/types.hpp>
 
 #include <chrono>
 #include <map>
