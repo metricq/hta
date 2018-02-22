@@ -70,7 +70,12 @@ public:
     std::vector<TimeAggregate> get(TimePoint t0, TimePoint t1, Duration interval,
                                    IntervalScope scope = IntervalScope::CLOSED_EXTENDED) override;
 
+    TimeValue last() override;
+    TimeAggregate last(Duration interval) override;
     std::pair<TimePoint, TimePoint> range() override;
+
+    std::size_t size() override;
+    std::size_t size(Duration interval) override;
 
 private:
     std::filesystem::path path_hta(Duration interval);
@@ -80,9 +85,6 @@ private:
     uint64_t find_raw_time_index(TimePoint t);
 
     TimePoint get_raw_ts(uint64_t index);
-
-    uint64_t size();
-    uint64_t size(Duration interval);
 
     TimePoint epoch();
     TimePoint epoch(Duration interval);

@@ -2,6 +2,7 @@
 
 #include <types.hpp>
 
+#include <cstdint>
 #include <vector>
 
 namespace hta::storage
@@ -19,6 +20,12 @@ public:
     virtual std::vector<TimeAggregate>
     get(TimePoint t0, TimePoint t1, Duration interval,
         IntervalScope scope = IntervalScope::CLOSED_EXTENDED) = 0;
+
+    virtual TimeValue last() = 0;
+    virtual TimeAggregate last(Duration interval) = 0;
+
+    virtual std::size_t size() = 0;
+    virtual std::size_t size(Duration interval) = 0;
 
     virtual std::pair<TimePoint, TimePoint> range() = 0;
 

@@ -3,7 +3,7 @@
 #include <metric.hpp>
 
 #include <cassert>
-
+#include <iostream>
 namespace hta
 {
 class Level
@@ -29,6 +29,9 @@ public:
         time_current = ta.time;
     }
 
+    // The lowest level uses this for integrals
+    // For higher levels, this is only used for consistency checks and refers to the end
+    // of the most recent consumed row
     TimePoint time_current;
     Aggregate aggregate;
 };
@@ -42,21 +45,77 @@ Metric::~Metric()
 {
 }
 
+Level Metric::restore_level(Duration interval)
+{
+    // How much did we already store here?
+    TimePoint time_closed;
+    if (storage_metric_->size(interval))
+    {
+        time_closed = storage_metric_->last(interval).time;
+    }
+    Level level;
+
+    if (storage_metric_->size() == 0)
+    {
+        // No need to restore anything.
+        return level;
+    }
+
+    auto time_end = storage_metric_->last().time;
+    if (interval == interval_min_)
+    {
+        auto data = storage_metric_->get(time_closed, time_end, IntervalScope::CLOSED_CLOSED);
+        if (data.size() > 0)
+        {
+            level.time_current = data[0].time;
+            for (auto& tv : data)
+            {
+                level.advance(tv);
+            }
+        }
+    }
+    else
+    {
+        auto smaller_interval = interval / interval_factor_;
+        auto data = storage_metric_->get(time_closed, time_end, smaller_interval,
+                                         IntervalScope::CLOSED_CLOSED);
+        for (auto& ta : data)
+        {
+            level.advance({ ta.time + interval, ta.aggregate });
+        }
+    }
+    std::cout << "Restoring " << interval.count()/1000000000 << " to "
+              << level.time_current.time_since_epoch().count()/1000000000 << "\n";
+    return level;
+}
+
+Level& Metric::get_level(Duration interval)
+{
+    auto it = levels_.find(interval);
+    if (it == levels_.end())
+    {
+        bool added;
+        std::tie(it, added) = levels_.try_emplace(interval, restore_level(interval));
+    }
+    return it->second;
+}
+
 void Metric::insert(TimeValue tv)
 {
     // Must not have an "invalid" time value... who knows what would happen...
     assert(tv.time);
-    storage_metric_->insert(tv);
 
     const auto interval = interval_min_;
-    auto& level = levels_[interval];
+    auto& level = get_level(interval);
+    // We must do this after get_level, otherwise it confuses the level restore
+    storage_metric_->insert(tv);
+
     if (!level.time_current)
     {
         // level.time_current = interval_begin(tv.time, interval);
         level.time_current = tv.time;
     }
     auto level_time_end = interval_end(level.time_current, interval);
-
     while (tv.time >= level_time_end)
     {
         // the point doesn't belong in the current interval,
@@ -83,16 +142,18 @@ void Metric::insert(TimeValue tv)
 
 void Metric::insert(Row row)
 {
-    storage_metric_->insert(row);
-
     const auto interval = row.interval * interval_factor_;
-    auto& level = levels_[interval];
+    auto& level = get_level(interval);
+    // We must do this after get_level, otherwise it confuses the level restore
+    storage_metric_->insert(row);
     if (!level.time_current)
     {
         level.time_current = row.end_time();
     }
     else
     {
+        std::cout << level.time_current.time_since_epoch().count()/1000000000 << " // "
+                  << row.time.time_since_epoch().count()/1000000000 << "\n";
         assert(level.time_current == row.time);
     }
     auto level_time_end = interval_end(level.time_current, interval);
@@ -135,12 +196,18 @@ std::vector<TimeAggregate> Metric::retrieve(TimePoint begin, TimePoint end, uint
     assert(begin <= end);
     auto duration = end - begin;
     auto interval_max_length = duration / min_samples;
-    if (interval_max_length < interval_min_)
+    return retrieve(begin, end, interval_max_length, scope);
+}
+
+std::vector<TimeAggregate> Metric::retrieve(TimePoint begin, TimePoint end, Duration interval_max,
+                                            IntervalScope scope)
+{
+    if (interval_max < interval_min_)
     {
         return retrieve_raw(begin, end, scope);
     }
     auto interval = interval_min_;
-    while (interval * interval_factor_ <= interval_max_length)
+    while (interval * interval_factor_ <= interval_max)
     {
         interval *= interval_factor_;
     }

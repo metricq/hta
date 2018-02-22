@@ -73,15 +73,15 @@ uint64_t Metric::size()
 uint64_t Metric::size(Duration interval)
 {
     auto fsize = file_hta(interval).size();
-    assert(0 == fsize % sizeof(Aggregate));
-    return fsize / sizeof(Aggregate);
+    assert(0 == fsize % sizeof(TimeAggregate));
+    return fsize / sizeof(TimeAggregate);
 }
 
 std::vector<TimeValue> Metric::get(TimePoint t0, TimePoint t1, IntervalScope scope)
 {
     uint64_t i0 = find_raw_time_index(t0);
     uint64_t i1 = find_raw_time_index(t1);
-    assert(scope == IntervalScope::CLOSED_EXTENDED);
+    // FIXME assert(scope == IntervalScope::CLOSED_EXTENDED);
 
     i1++; // extended
     size_t count = i1 - i0;
@@ -143,12 +143,25 @@ std::vector<TimeAggregate> Metric::get(TimePoint t0, TimePoint t1, Duration inte
     return result;
 }
 
+TimeValue Metric::last()
+{
+    TimeValue tv;
+    file_raw().read(tv, (size() - 1) * sizeof(TimeValue));
+    return tv;
+}
+
+TimeAggregate Metric::last(Duration interval)
+{
+    TimeAggregate ta;
+    file_hta(interval).read(ta, (size(interval) - 1) * sizeof(TimeAggregate));
+    return ta;
+}
+
 std::pair<TimePoint, TimePoint> Metric::range()
 {
-    TimeValue first, last;
+    TimeValue first;
     file_raw().read(first, 0);
-    file_raw().read(last, size() - 1);
-    return { first.time, last.time };
+    return { first.time, last().time };
 }
 
 std::filesystem::path Metric::path_hta(Duration interval)
