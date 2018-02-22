@@ -51,7 +51,7 @@ Level Metric::restore_level(Duration interval)
     TimePoint time_closed;
     if (storage_metric_->size(interval))
     {
-        time_closed = storage_metric_->last(interval).time;
+        time_closed = storage_metric_->last(interval).time + interval;
     }
     Level level;
 
@@ -64,10 +64,18 @@ Level Metric::restore_level(Duration interval)
     auto time_end = storage_metric_->last().time;
     if (interval == interval_min_)
     {
-        auto data = storage_metric_->get(time_closed, time_end, IntervalScope::CLOSED_CLOSED);
+        auto data = storage_metric_->get(time_closed, time_end,
+                                         IntervalScope{ Scope::closed, Scope::closed });
         if (data.size() > 0)
         {
-            level.time_current = data[0].time;
+            if (time_closed)
+            {
+                level.time_current = time_closed;
+            }
+            else
+            {
+                level.time_current = data[0].time;
+            }
             for (auto& tv : data)
             {
                 level.advance(tv);
@@ -78,14 +86,14 @@ Level Metric::restore_level(Duration interval)
     {
         auto smaller_interval = interval / interval_factor_;
         auto data = storage_metric_->get(time_closed, time_end, smaller_interval,
-                                         IntervalScope::CLOSED_CLOSED);
+                                         IntervalScope{ Scope::closed, Scope::closed });
         for (auto& ta : data)
         {
-            level.advance({ ta.time + interval, ta.aggregate });
+            level.advance({ ta.time + smaller_interval, ta.aggregate });
         }
     }
-    std::cout << "Restoring " << interval.count()/1000000000 << " to "
-              << level.time_current.time_since_epoch().count()/1000000000 << "\n";
+    std::cout << "Restoring " << interval.count() / 1000000000 << " to "
+              << level.time_current.time_since_epoch().count() / 1000000000 << "\n";
     return level;
 }
 
@@ -152,8 +160,8 @@ void Metric::insert(Row row)
     }
     else
     {
-        std::cout << level.time_current.time_since_epoch().count()/1000000000 << " // "
-                  << row.time.time_since_epoch().count()/1000000000 << "\n";
+        std::cout << level.time_current.time_since_epoch().count() / 1000000000 << " // "
+                  << row.time.time_since_epoch().count() / 1000000000 << "\n";
         assert(level.time_current == row.time);
     }
     auto level_time_end = interval_end(level.time_current, interval);

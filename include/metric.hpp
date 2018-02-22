@@ -24,13 +24,16 @@ public:
 
     void insert(TimeValue tv);
     std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples = 1000,
-                                        IntervalScope scope = IntervalScope::CLOSED_EXTENDED);
+                                        IntervalScope scope = IntervalScope{ Scope::extended,
+                                                                             Scope::open });
     std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, Duration interval_max,
-                                        IntervalScope scope = IntervalScope::CLOSED_EXTENDED);
+                                        IntervalScope scope = IntervalScope{ Scope::extended,
+                                                                             Scope::open });
 
 private:
     std::vector<TimeAggregate> retrieve_raw(TimePoint begin, TimePoint end,
-                                            IntervalScope scope = IntervalScope::CLOSED_EXTENDED);
+                                            IntervalScope scope = IntervalScope{ Scope::closed,
+                                                                                 Scope::extended });
 
     void insert(Row row);
     Level& get_level(Duration interval);

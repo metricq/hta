@@ -74,15 +74,18 @@ struct Row
     }
 };
 
-enum class IntervalScope
+enum class Scope
 {
-    OPEN_OPEN,
-    OPEN_CLOSED,
-    CLOSED_OPEN,
-    CLOSED_CLOSED,   // interval closed on both ends
-    CLOSED_EXTENDED, // interval extended by one element on the right end
-    EXTENDED_CLOSED,
-    EXTENDED_EXTENDED,
+    open,
+    closed,
+    extended, // one more than the open, includes a point that is at least on or outside of the
+              // border
+};
+
+struct IntervalScope
+{
+    Scope begin;
+    Scope end;
 };
 
 inline TimePoint interval_begin(TimePoint time, Duration interval)

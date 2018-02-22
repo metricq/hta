@@ -15,11 +15,9 @@ public:
 
     virtual void flush() = 0;
 
-    virtual std::vector<TimeValue> get(TimePoint t0, TimePoint t1,
-                                       IntervalScope scope = IntervalScope::CLOSED_EXTENDED) = 0;
-    virtual std::vector<TimeAggregate>
-    get(TimePoint t0, TimePoint t1, Duration interval,
-        IntervalScope scope = IntervalScope::CLOSED_EXTENDED) = 0;
+    virtual std::vector<TimeValue> get(TimePoint t0, TimePoint t1, IntervalScope scope) = 0;
+    virtual std::vector<TimeAggregate> get(TimePoint t0, TimePoint t1, Duration interval,
+                                           IntervalScope scope) = 0;
 
     virtual TimeValue last() = 0;
     virtual TimeAggregate last(Duration interval) = 0;

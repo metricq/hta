@@ -32,8 +32,12 @@ void Metric::flush()
     }
 }
 
-uint64_t Metric::find_raw_time_index(TimePoint t, uint64_t left, uint64_t right)
+uint64_t Metric::find_raw_time_index_before_or_on(TimePoint t, uint64_t left, uint64_t right)
 {
+    // left < right means right != 0
+    // assumes monotonicity ts(left) < ts(right)
+    // invariant ts(left) <= t < ts(right)
+    // right can be size() // out of range, but the pivot can never be
     assert(left < right);
     if (right - left == 1)
     {
@@ -43,17 +47,35 @@ uint64_t Metric::find_raw_time_index(TimePoint t, uint64_t left, uint64_t right)
     TimePoint t_pivot = get_raw_ts(pivot);
     if (t >= t_pivot)
     {
-        return find_raw_time_index(t, pivot, right);
+        return find_raw_time_index_before_or_on(t, pivot, right);
     }
     else
     {
-        return find_raw_time_index(t, left, pivot);
+        return find_raw_time_index_before_or_on(t, left, pivot);
     }
 }
 
-uint64_t Metric::find_raw_time_index(TimePoint t)
+uint64_t Metric::find_raw_time_index_on_or_after(TimePoint t, uint64_t left, uint64_t right)
 {
-    return find_raw_time_index(t, 0, size());
+    // left < right means right != 0
+    // assumes monotonicity ts(left) < ts(right)
+    // invariant ts(left) < t <= ts(right)
+    // right can be size() // out of range, but the pivot can never be
+    assert(left < right);
+    if (right - left == 1)
+    {
+        return right;
+    }
+    uint64_t pivot = (left + right) / 2;
+    TimePoint t_pivot = get_raw_ts(pivot);
+    if (t > t_pivot)
+    {
+        return find_raw_time_index_on_or_after(t, pivot, right);
+    }
+    else
+    {
+        return find_raw_time_index_on_or_after(t, left, pivot);
+    }
 }
 
 TimePoint Metric::get_raw_ts(uint64_t index)
@@ -77,16 +99,60 @@ uint64_t Metric::size(Duration interval)
     return fsize / sizeof(TimeAggregate);
 }
 
-std::vector<TimeValue> Metric::get(TimePoint t0, TimePoint t1, IntervalScope scope)
+std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope scope)
 {
-    uint64_t i0 = find_raw_time_index(t0);
-    uint64_t i1 = find_raw_time_index(t1);
-    // FIXME assert(scope == IntervalScope::CLOSED_EXTENDED);
+    const auto sz = size();
+    if (sz == 0)
+    {
+        return {};
+    }
+    uint64_t index_begin;
+    /* this is the index of the end _element_ (not after!) according to scope.end
+     * It may be out of scope (==size()) in some cases */
+    uint64_t index_end;
+    // This is quite complex and possibly bad for performance
+    // TODO optimize // simplify
+    switch (scope.begin)
+    {
+    case Scope::closed:
+        index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
+        if (index_begin < sz)
+        {
+            index_begin++;
+        }
+        break;
+    case Scope::open:
+        index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
+        break;
+    case Scope::extended:
+        index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
+        break;
+    }
 
-    i1++; // extended
-    size_t count = i1 - i0;
+    switch (scope.end)
+    {
+    case Scope::closed:
+        index_end = find_raw_time_index_before_or_on(end, 0, sz);
+        break;
+    case Scope::open:
+        index_end = find_raw_time_index_on_or_after(end, 0, sz);
+        if (index_end > 0)
+        {
+            index_end--;
+        }
+        break;
+    case Scope::extended:
+        index_end = find_raw_time_index_on_or_after(end, 0, sz);
+    }
+
+    size_t count = index_end - index_begin;
+    if (index_end < sz)
+    {
+        // We include also the requested end element, but only if it's not outside the range
+        count++;
+    }
     std::vector<TimeValue> result(count);
-    file_raw().read(result, i0 * sizeof(TimeValue));
+    file_raw().read(result, index_begin * sizeof(TimeValue));
     return result;
 }
 
