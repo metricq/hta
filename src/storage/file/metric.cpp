@@ -80,23 +80,17 @@ uint64_t Metric::find_raw_time_index_on_or_after(TimePoint t, uint64_t left, uin
 
 TimePoint Metric::get_raw_ts(uint64_t index)
 {
-    TimePoint time;
-    file_raw().read(time, index * sizeof(TimeValue));
-    return time;
+    return file_raw().read(index).time;
 }
 
 uint64_t Metric::size()
 {
-    auto fsize = file_raw().size();
-    assert(0 == fsize % sizeof(TimeValue));
-    return fsize / sizeof(TimeValue);
+    return file_raw().size();
 }
 
 uint64_t Metric::size(Duration interval)
 {
-    auto fsize = file_hta(interval).size();
-    assert(0 == fsize % sizeof(TimeAggregate));
-    return fsize / sizeof(TimeAggregate);
+    return file_hta(interval).size();
 }
 
 std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope scope)
@@ -152,16 +146,14 @@ std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope
         count++;
     }
     std::vector<TimeValue> result(count);
-    file_raw().read(result, index_begin * sizeof(TimeValue));
+    file_raw().read(result, index_begin);
     return result;
 }
 
 TimePoint Metric::epoch()
 {
     // TODO cache!
-    TimePoint start;
-    file_raw().read(start, 0);
-    return start;
+    return file_raw().read(0).time;
 }
 
 TimePoint Metric::epoch(Duration interval)
@@ -195,7 +187,7 @@ std::vector<TimeAggregate> Metric::get(TimePoint t0, TimePoint t1, Duration inte
     size_t count = i1 - i0;
 
     std::vector<TimeAggregate> result(count);
-    file.read(result, i0 * sizeof(TimeAggregate));
+    file.read(result, i0);
 
 #ifndef NDEBUG
     // Check consistency of times
@@ -211,22 +203,17 @@ std::vector<TimeAggregate> Metric::get(TimePoint t0, TimePoint t1, Duration inte
 
 TimeValue Metric::last()
 {
-    TimeValue tv;
-    file_raw().read(tv, (size() - 1) * sizeof(TimeValue));
-    return tv;
+    return file_raw().read(size() - 1);
 }
 
 TimeAggregate Metric::last(Duration interval)
 {
-    TimeAggregate ta;
-    file_hta(interval).read(ta, (size(interval) - 1) * sizeof(TimeAggregate));
-    return ta;
+    return file_hta(interval).read(size(interval) - 1);
 }
 
 std::pair<TimePoint, TimePoint> Metric::range()
 {
-    TimeValue first;
-    file_raw().read(first, 0);
+    TimeValue first = file_raw().read(0);
     return { first.time, last().time };
 }
 
@@ -242,7 +229,7 @@ std::filesystem::path Metric::path_raw()
     return path_ / std::filesystem::path("raw.hta");
 }
 
-Metric::MetricFile& Metric::file_hta(Duration interval)
+Metric::HtaFile& Metric::file_hta(Duration interval)
 {
     auto it = files_hta_.find(interval);
     if (it == files_hta_.end())

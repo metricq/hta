@@ -53,7 +53,8 @@ private:
 
         // Only add stuff - don't change it
     };
-    using MetricFile = File<Header>;
+    using RawFile = File<Header, TimeValue>;
+    using HtaFile = File<Header, TimeAggregate>;
 
 public:
     Metric(const std::filesystem::path& path);
@@ -86,17 +87,17 @@ private:
     TimePoint epoch();
     TimePoint epoch(Duration interval);
 
-    MetricFile& file_raw()
+    RawFile& file_raw()
     {
         return file_raw_;
     }
 
-    MetricFile& file_hta(Duration interval);
+    HtaFile& file_hta(Duration interval);
 
     std::filesystem::path path_;
-    MetricFile file_raw_;
+    RawFile file_raw_;
     // TODO use better data structure to optimize accesses for lowest interval
     // e.g. linear search through sorted vector
-    std::map<Duration, MetricFile> files_hta_;
+    std::map<Duration, HtaFile> files_hta_;
 };
 }

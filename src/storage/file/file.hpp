@@ -30,7 +30,7 @@ namespace FileOpenTag
     };
 }
 
-template <class HeaderType>
+template <class HeaderType, class T>
 class File
 {
 private:
@@ -48,6 +48,11 @@ private:
 
 public:
     using pos_type = std::fstream::pos_type;
+    using value_type = T;
+    using size_type = std::size_t;
+
+    static_assert(std::is_trivially_copyable_v<T>, "T must be a trivially copyable.");
+    static constexpr size_type value_size = sizeof(T);
 
     File(FileOpenTag::Create, const std::filesystem::path& filename, const HeaderType& header)
     : File(filename, std::ios_base::trunc | std::ios_base::out)
@@ -87,18 +92,21 @@ public:
         return header;
     }
 
-    template <typename T>
-    void write(const T& thing)
+    void write(const value_type& thing)
     {
-        static_assert(std::is_trivially_copyable_v<T>, "T must be a POD.");
-        stream_.write(reinterpret_cast<const char*>(&thing), sizeof(thing));
+        stream_.write(reinterpret_cast<const char*>(&thing), value_size);
     }
 
-    template <typename T>
-    void read(T& thing, pos_type pos)
+    value_type read(pos_type pos)
     {
-        stream_.seekg(data_begin_ + pos);
-        read(thing);
+        stream_.seekg(data_begin_ + pos * value_size);
+        return read<value_type>();
+    }
+
+    void read(std::vector<value_type>& vector, pos_type pos)
+    {
+        stream_.seekg(data_begin_ + pos * value_size);
+        read(vector);
     }
 
     void flush()
@@ -106,22 +114,33 @@ public:
         stream_.flush();
     }
 
-    uint64_t size()
+    size_type size()
     {
         stream_.seekg(0, stream_.end);
-        return stream_.tellg() - data_begin_;
+        auto size_bytes = ssize_t(stream_.tellg()) - ssize_t(data_begin_);
+        assert(size_bytes >= 0);
+        assert(0 == size_bytes % value_size);
+        return size_bytes / value_size;
     }
 
 private:
-    template <typename T>
-    void read(T& thing)
+    template <typename TT>
+    void write(const TT& thing)
     {
-        static_assert(std::is_trivially_copyable_v<T>, "T must be a POD.");
-        stream_.read(reinterpret_cast<char*>(&thing), sizeof(thing));
+        static_assert(std::is_trivially_copyable_v<TT>, "Type must be a trivially copyable.");
+        stream_.write(reinterpret_cast<const char*>(&thing), sizeof(TT));
     }
 
-    template <typename T>
-    void read(std::vector<T>& vec)
+    template <typename TT>
+    TT read()
+    {
+        static_assert(std::is_trivially_copyable_v<TT>, "Type must be a trivially copyable.");
+        TT thing;
+        stream_.read(reinterpret_cast<char*>(&thing), sizeof(thing));
+        return thing;
+    }
+
+    void read(std::vector<value_type>& vec)
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be a POD.");
         stream_.exceptions(std::ios::badbit);
@@ -148,19 +167,19 @@ private:
         write(header);
         data_begin_ = header_begin_ + header_size;
         assert(stream_.tellp() == data_begin_);
+        flush();
+        size();
     }
 
     void read_preamble()
     {
-        std::array<char, 8> read_magic_bytes;
-        read(read_magic_bytes);
+        const auto read_magic_bytes = read<std::array<char, 8>>();
         if (!std::equal(read_magic_bytes.begin(), read_magic_bytes.end(), magic_bytes.begin()))
         {
             throw std::runtime_error("Magic bytes of file do not match. Invalid or corrupt file:"s +
                                      filename_.string());
         }
-        uint64_t read_bom;
-        read(read_bom);
+        const auto read_bom = read<uint64_t>();
         if (read_bom != byte_order_mark)
         {
             throw std::runtime_error("Byte order mark does not match. File written with "
@@ -168,8 +187,7 @@ private:
                                      filename_.string());
         }
 
-        uint64_t header_size;
-        read(header_size);
+        const auto header_size = read<uint64_t>();
         data_begin_ = header_begin_ + header_size;
     }
 
