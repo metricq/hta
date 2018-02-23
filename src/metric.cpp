@@ -3,7 +3,7 @@
 #include <hta/metric.hpp>
 
 #include <cassert>
-#include <iostream>
+
 namespace hta
 {
 class Level
@@ -47,18 +47,19 @@ Metric::~Metric()
 
 Level Metric::restore_level(Duration interval)
 {
+    Level level;
+    if (storage_metric_->size() == 0)
+    {
+        // No need to restore anything.
+        return level;
+    }
+
     // How much did we already store here?
     TimePoint time_closed;
     if (storage_metric_->size(interval))
     {
         time_closed = storage_metric_->last(interval).time + interval;
-    }
-    Level level;
-
-    if (storage_metric_->size() == 0)
-    {
-        // No need to restore anything.
-        return level;
+        level.time_current = time_closed;
     }
 
     auto time_end = storage_metric_->last().time;
@@ -68,11 +69,7 @@ Level Metric::restore_level(Duration interval)
                                          IntervalScope{ Scope::closed, Scope::closed });
         if (data.size() > 0)
         {
-            if (time_closed)
-            {
-                level.time_current = time_closed;
-            }
-            else
+            if (!level.time_current)
             {
                 level.time_current = data[0].time;
             }
@@ -92,8 +89,6 @@ Level Metric::restore_level(Duration interval)
             level.advance({ ta.time + smaller_interval, ta.aggregate });
         }
     }
-    std::cout << "Restoring " << interval.count() / 1000000000 << " to "
-              << level.time_current.time_since_epoch().count() / 1000000000 << "\n";
     return level;
 }
 
@@ -160,8 +155,6 @@ void Metric::insert(Row row)
     }
     else
     {
-        std::cout << level.time_current.time_since_epoch().count() / 1000000000 << " // "
-                  << row.time.time_since_epoch().count() / 1000000000 << "\n";
         assert(level.time_current == row.time);
     }
     auto level_time_end = interval_end(level.time_current, interval);

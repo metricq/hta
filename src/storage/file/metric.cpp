@@ -109,14 +109,14 @@ std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope
     switch (scope.begin)
     {
     case Scope::closed:
+        index_begin = find_raw_time_index_on_or_after(begin, 0, sz);
+        break;
+    case Scope::open:
         index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
         if (index_begin < sz)
         {
             index_begin++;
         }
-        break;
-    case Scope::open:
-        index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
         break;
     case Scope::extended:
         index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
