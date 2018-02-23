@@ -80,6 +80,7 @@ enum class Scope
     closed,
     extended, // one more than the open, includes a point that is at least on or outside of the
               // border
+    infinity,
 };
 
 struct IntervalScope

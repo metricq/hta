@@ -32,7 +32,7 @@ void Metric::flush()
     }
 }
 
-uint64_t Metric::find_raw_time_index_before_or_on(TimePoint t, uint64_t left, uint64_t right)
+uint64_t Metric::find_index_before_or_on(TimePoint t, uint64_t left, uint64_t right)
 {
     // left < right means right != 0
     // assumes monotonicity ts(left) < ts(right)
@@ -47,15 +47,15 @@ uint64_t Metric::find_raw_time_index_before_or_on(TimePoint t, uint64_t left, ui
     TimePoint t_pivot = get_raw_ts(pivot);
     if (t >= t_pivot)
     {
-        return find_raw_time_index_before_or_on(t, pivot, right);
+        return find_index_before_or_on(t, pivot, right);
     }
     else
     {
-        return find_raw_time_index_before_or_on(t, left, pivot);
+        return find_index_before_or_on(t, left, pivot);
     }
 }
 
-uint64_t Metric::find_raw_time_index_on_or_after(TimePoint t, uint64_t left, uint64_t right)
+uint64_t Metric::find_index_on_or_after(TimePoint t, uint64_t left, uint64_t right)
 {
     // left < right means right != 0
     // assumes monotonicity ts(left) < ts(right)
@@ -70,11 +70,11 @@ uint64_t Metric::find_raw_time_index_on_or_after(TimePoint t, uint64_t left, uin
     TimePoint t_pivot = get_raw_ts(pivot);
     if (t > t_pivot)
     {
-        return find_raw_time_index_on_or_after(t, pivot, right);
+        return find_index_on_or_after(t, pivot, right);
     }
     else
     {
-        return find_raw_time_index_on_or_after(t, left, pivot);
+        return find_index_on_or_after(t, left, pivot);
     }
 }
 
@@ -109,34 +109,41 @@ std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope
     switch (scope.begin)
     {
     case Scope::closed:
-        index_begin = find_raw_time_index_on_or_after(begin, 0, sz);
+        index_begin = find_index_on_or_after(begin, 0, sz);
         break;
     case Scope::open:
-        index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
+        index_begin = find_index_before_or_on(begin, 0, sz);
         if (index_begin < sz)
         {
             index_begin++;
         }
         break;
     case Scope::extended:
-        index_begin = find_raw_time_index_before_or_on(begin, 0, sz);
+        index_begin = find_index_before_or_on(begin, 0, sz);
+        break;
+    case Scope::infinity:
+        index_begin = 0;
         break;
     }
 
     switch (scope.end)
     {
     case Scope::closed:
-        index_end = find_raw_time_index_before_or_on(end, 0, sz);
+        index_end = find_index_before_or_on(end, 0, sz);
         break;
     case Scope::open:
-        index_end = find_raw_time_index_on_or_after(end, 0, sz);
+        index_end = find_index_on_or_after(end, 0, sz);
         if (index_end > 0)
         {
             index_end--;
         }
         break;
     case Scope::extended:
-        index_end = find_raw_time_index_on_or_after(end, 0, sz);
+        index_end = find_index_on_or_after(end, 0, sz);
+        break;
+    case Scope::infinity:
+        index_end = sz - 1;
+        break;
     }
 
     size_t count = index_end - index_begin;
@@ -161,37 +168,67 @@ TimePoint Metric::epoch(Duration interval)
     return interval_begin(epoch(), interval);
 }
 
-std::vector<TimeAggregate> Metric::get(TimePoint t0, TimePoint t1, Duration interval,
+std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration interval,
                                        IntervalScope scope)
 {
-    if (size() == 0)
+    auto sz = size();
+    if (sz == 0)
     {
         return {};
     }
 
     auto& file = file_hta(interval);
 
-    assert(t1 >= t0);
-    auto start = epoch(interval);
-    auto d0 = t0 - start;
-    if (d0.count() < 0)
+    assert(end >= begin || scope.begin == Scope::infinity || scope.end == Scope::infinity);
+
+    auto epoch_ = epoch(interval);
+    auto offset_begin = begin - epoch_;
+    auto offset_end = end - epoch_;
+
+    int64_t index_begin;
+    int64_t index_end;
+    switch (scope.begin)
     {
-        d0 = Duration(0);
+    case Scope::closed:
+        index_begin = (offset_begin - Duration(1)) / interval + 1;
+        break;
+    case Scope::open:
+        index_begin = offset_begin / interval + 1;
+        break;
+    case Scope::extended:
+        index_begin = offset_begin / interval;
+        break;
+    case Scope::infinity:
+        index_begin = 0;
+        break;
     }
-    auto d1 = t1 - start;
 
-    uint64_t i0 = d0 / interval;
-    uint64_t i1 = d1 / interval + 1; // @TODO extended?!
+    switch (scope.end)
+    {
+    case Scope::closed:
+        index_end = offset_end / interval;
+        break;
+    case Scope::open:
+        index_end = (offset_end - Duration(1)) / interval;
+        break;
+    case Scope::extended:
+        index_end = (offset_end - Duration(1)) / interval + 1;
+        break;
+    case Scope::infinity:
+        index_end = sz - 1;
+        break;
+    }
 
-    i1 = std::min(size(), i1);
-    size_t count = i1 - i0;
+    index_begin = std::max<int64_t>(index_begin, 0);
+    index_end = std::min<int64_t>(index_end, sz);
+    size_t count = index_end - index_begin + 1;
 
     std::vector<TimeAggregate> result(count);
-    file.read(result, i0);
+    file.read(result, index_begin);
 
 #ifndef NDEBUG
     // Check consistency of times
-    TimePoint t = start + i0 * interval;
+    TimePoint t = epoch_ + index_begin * interval;
     for (const auto& ta : result)
     {
         assert(ta.time == t);

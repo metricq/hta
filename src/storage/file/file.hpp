@@ -128,7 +128,7 @@ private:
     void write(const TT& thing)
     {
         static_assert(std::is_trivially_copyable_v<TT>, "Type must be a trivially copyable.");
-        stream_.write(reinterpret_cast<const char*>(&thing), sizeof(TT));
+        stream_.write(reinterpret_cast<const char*>(&thing), sizeof(thing));
     }
 
     template <typename TT>
@@ -144,14 +144,14 @@ private:
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be a POD.");
         stream_.exceptions(std::ios::badbit);
-        stream_.read(reinterpret_cast<char*>(vec.data()), sizeof(T) * vec.size());
+        stream_.read(reinterpret_cast<char*>(vec.data()), value_size * vec.size());
         if (stream_.eof())
         {
             // how much did we actually read...
             auto count = stream_.gcount();
-            assert(0 == count % sizeof(T));
-            assert(count / sizeof(T) <= vec.size());
-            vec.resize(count / sizeof(T));
+            assert(0 == count % value_size);
+            assert(count / value_size <= vec.size());
+            vec.resize(count / value_size);
             stream_.clear();
         }
         stream_.exceptions(std::ios::badbit | std::ios::failbit);

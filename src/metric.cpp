@@ -56,17 +56,18 @@ Level Metric::restore_level(Duration interval)
 
     // How much did we already store here?
     TimePoint time_closed;
+    Scope scope_begin = Scope::infinity;
     if (storage_metric_->size(interval))
     {
         time_closed = storage_metric_->last(interval).time + interval;
+        scope_begin = Scope ::closed;
         level.time_current = time_closed;
     }
 
-    auto time_end = storage_metric_->last().time;
     if (interval == interval_min_)
     {
-        auto data = storage_metric_->get(time_closed, time_end,
-                                         IntervalScope{ Scope::closed, Scope::closed });
+        auto data =
+            storage_metric_->get(time_closed, {}, IntervalScope{ scope_begin, Scope::infinity });
         if (data.size() > 0)
         {
             if (!level.time_current)
@@ -82,8 +83,8 @@ Level Metric::restore_level(Duration interval)
     else
     {
         auto smaller_interval = interval / interval_factor_;
-        auto data = storage_metric_->get(time_closed, time_end, smaller_interval,
-                                         IntervalScope{ Scope::closed, Scope::closed });
+        auto data = storage_metric_->get(time_closed, {}, smaller_interval,
+                                         IntervalScope{ scope_begin, Scope::infinity });
         for (auto& ta : data)
         {
             level.advance({ ta.time + smaller_interval, ta.aggregate });
