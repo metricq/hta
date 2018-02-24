@@ -9,3 +9,7 @@ target_link_libraries(hta.test_aggregation PRIVATE hta::hta catch::catch json::j
 add_executable(hta.test_restore restore.cpp)
 add_test(hta.test_restore hta.test_restore)
 target_link_libraries(hta.test_restore PRIVATE hta::hta catch::catch json::json)
+
+add_executable(hta.test_scope scope.cpp)
+add_test(hta.test_scope hta.test_scope)
+target_link_libraries(hta.test_scope PRIVATE hta::hta catch::catch json::json)
