@@ -23,17 +23,19 @@ public:
     ~Metric();
 
     void insert(TimeValue tv);
-    std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples = 1000,
+    std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
                                         IntervalScope scope = IntervalScope{ Scope::extended,
                                                                              Scope::open });
     std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, Duration interval_max,
                                         IntervalScope scope = IntervalScope{ Scope::extended,
                                                                              Scope::open });
+    std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
+                                    IntervalScope scope = { Scope::closed, Scope::extended });
 
 private:
-    std::vector<TimeAggregate> retrieve_raw(TimePoint begin, TimePoint end,
-                                            IntervalScope scope = IntervalScope{ Scope::closed,
-                                                                                 Scope::extended });
+    std::vector<TimeAggregate> retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
+                                                           IntervalScope scope = IntervalScope{Scope::closed,
+                                                                                               Scope::extended});
 
     void insert(Row row);
     Level& get_level(Duration interval);
