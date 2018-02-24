@@ -14,9 +14,10 @@ using json = nlohmann::json;
 using namespace std::literals::chrono_literals;
 
 constexpr auto offset = 1500000000s;
-constexpr hta::TimePoint tp(int64_t duration_seconds)
+constexpr hta::TimePoint tp(int64_t duration_seconds, int64_t epsilon = 0)
 {
-    return hta::TimePoint(hta::duration_cast(offset + std::chrono::seconds(duration_seconds)));
+    return hta::TimePoint(hta::Duration(epsilon) +
+                          hta::duration_cast(offset + std::chrono::seconds(duration_seconds)));
 }
 
 TEST_CASE("HTA file can basically be written and read.", "[hta]")
@@ -57,79 +58,105 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
         hta::Directory dir(config_path);
         auto metric = dir["foo"];
 
+        // RAW tests
         {
-            hta::IntervalScope is = { hta::Scope::closed, hta::Scope::open };
+            auto count_200 = [&metric](int64_t begin_epsilon, int64_t end_epsilon,
+                                       hta::IntervalScope interval_scope) {
+                return metric
+                    ->retrieve(tp(10100, begin_epsilon), tp(10300, end_epsilon), interval_scope)
+                    .size();
+            };
             {
-                auto result = metric->retrieve(tp(10100), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 2);
+                hta::IntervalScope is = { hta::Scope::closed, hta::Scope::open };
+                CHECK(count_200(0, 0, is) == 200);
+                CHECK(count_200(-1, 0, is) == 200);
+                CHECK(count_200(1, 0, is) == 199);
+                CHECK(count_200(0, -1, is) == 200);
+                CHECK(count_200(0, 1, is) == 201);
             }
             {
-                auto result = metric->retrieve(tp(10099), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 2);
+                hta::IntervalScope is = { hta::Scope::closed, hta::Scope::closed };
+                CHECK(count_200(0, 0, is) == 201);
+                CHECK(count_200(-1, 0, is) == 201);
+                CHECK(count_200(1, 0, is) == 200);
+                CHECK(count_200(0, -1, is) == 200);
+                CHECK(count_200(0, 1, is) == 201);
             }
             {
-                auto result = metric->retrieve(tp(10100), tp(10301), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
+                hta::IntervalScope is = { hta::Scope::closed, hta::Scope::extended };
+                CHECK(count_200(0, 0, is) == 201);
+                CHECK(count_200(-1, 0, is) == 201);
+                CHECK(count_200(1, 0, is) == 200);
+                CHECK(count_200(0, -1, is) == 201);
+                CHECK(count_200(0, 1, is) == 202);
             }
+            {
+                hta::IntervalScope is = { hta::Scope::open, hta::Scope::open };
+                CHECK(count_200(0, 0, is) == 199);
+                CHECK(count_200(-1, 0, is) == 200);
+                CHECK(count_200(1, 0, is) == 199);
+                CHECK(count_200(0, -1, is) == 199);
+                CHECK(count_200(0, 1, is) == 200);
+            }
+            {
+                hta::IntervalScope is = { hta::Scope::extended, hta::Scope::open };
+                CHECK(count_200(0, 0, is) == 200);
+                CHECK(count_200(-1, 0, is) == 201);
+                CHECK(count_200(1, 0, is) == 200);
+                CHECK(count_200(0, -1, is) == 200);
+                CHECK(count_200(0, 1, is) == 201);
+            }
+            CHECK(count_200(0, 0, { hta::Scope::infinity, hta::Scope ::infinity }) == 1000000);
         }
+
+        // Aggregate tests
         {
-            hta::IntervalScope is = { hta::Scope::closed, hta::Scope::closed };
+            auto count_2 = [&metric](int64_t begin_epsilon, int64_t end_epsilon,
+                                     hta::IntervalScope interval_scope) {
+                return metric
+                    ->retrieve(tp(10100, begin_epsilon), tp(10300, end_epsilon),
+                               hta::duration_cast(100s), interval_scope)
+                    .size();
+            };
             {
-                auto result = metric->retrieve(tp(10100), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
+                hta::IntervalScope is = { hta::Scope::closed, hta::Scope::open };
+                CHECK(count_2(0, 0, is) == 2);
+                CHECK(count_2(-1, 0, is) == 2);
+                CHECK(count_2(1, 0, is) == 1);
+                CHECK(count_2(0, -1, is) == 2);
+                CHECK(count_2(0, 1, is) == 3);
             }
             {
-                auto result = metric->retrieve(tp(10099), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
+                hta::IntervalScope is = { hta::Scope::closed, hta::Scope::closed };
+                CHECK(count_2(0, 0, is) == 3);
+                CHECK(count_2(-1, 0, is) == 3);
+                CHECK(count_2(1, 0, is) == 2);
+                CHECK(count_2(0, -1, is) == 2);
+                CHECK(count_2(0, 1, is) == 3);
             }
             {
-                auto result = metric->retrieve(tp(10100), tp(10301), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
-            }
-        }
-        {
-            hta::IntervalScope is = { hta::Scope::closed, hta::Scope::extended };
-            {
-                auto result = metric->retrieve(tp(100), tp(300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
+                hta::IntervalScope is = { hta::Scope::closed, hta::Scope::extended };
+                CHECK(count_2(0, 0, is) == 3);
+                CHECK(count_2(-1, 0, is) == 3);
+                CHECK(count_2(1, 0, is) == 2);
+                CHECK(count_2(0, -1, is) == 3);
+                CHECK(count_2(0, 1, is) == 4);
             }
             {
-                auto result = metric->retrieve(tp(99), tp(300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
+                hta::IntervalScope is = { hta::Scope::open, hta::Scope::open };
+                CHECK(count_2(0, 0, is) == 1);
+                CHECK(count_2(-1, 0, is) == 2);
+                CHECK(count_2(1, 0, is) == 1);
+                CHECK(count_2(0, -1, is) == 1);
+                CHECK(count_2(0, 1, is) == 2);
             }
             {
-                auto result = metric->retrieve(tp(100), tp(301), hta::duration_cast(100s), is);
-                CHECK(result.size() == 4);
-            }
-        }
-        {
-            hta::IntervalScope is = { hta::Scope::open, hta::Scope::open };
-            {
-                auto result = metric->retrieve(tp(10100), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 1);
-            }
-            {
-                auto result = metric->retrieve(tp(10099), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 2);
-            }
-            {
-                auto result = metric->retrieve(tp(10100), tp(10301), hta::duration_cast(100s), is);
-                CHECK(result.size() == 2);
-            }
-        }
-        {
-            hta::IntervalScope is = { hta::Scope::extended, hta::Scope::open };
-            {
-                auto result = metric->retrieve(tp(10100), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 2);
-            }
-            {
-                auto result = metric->retrieve(tp(10099), tp(10300), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
-            }
-            {
-                auto result = metric->retrieve(tp(10100), tp(10301), hta::duration_cast(100s), is);
-                CHECK(result.size() == 3);
+                hta::IntervalScope is = { hta::Scope::extended, hta::Scope::open };
+                CHECK(count_2(0, 0, is) == 2);
+                CHECK(count_2(-1, 0, is) == 3);
+                CHECK(count_2(1, 0, is) == 2);
+                CHECK(count_2(0, -1, is) == 2);
+                CHECK(count_2(0, 1, is) == 3);
             }
         }
     }
