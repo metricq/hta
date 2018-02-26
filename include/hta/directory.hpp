@@ -1,15 +1,9 @@
 #pragma once
 
+#include <hta/filesystem.hpp>
+
 #include <unordered_map>
-#if __has_include(<filesystem>)
-#include <filesystem>
-#else
-#include <experimental/filesystem>
-namespace std
-{
-using namespace experimental;
-}
-#endif
+
 
 namespace hta
 {
