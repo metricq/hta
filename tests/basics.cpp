@@ -44,8 +44,8 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     {
         hta::Directory dir(config_path);
         auto metric = dir["foo"];
-        auto result =
-            metric->retrieve(hta::TimePoint(hta::Duration(22)), hta::TimePoint(hta::Duration(24)));
+        auto result = metric->retrieve(hta::TimePoint(hta::Duration(22)),
+                                       hta::TimePoint(hta::Duration(24)), 100);
         REQUIRE(result.size() == 1);
         REQUIRE(result.at(0).time == test_sample.time);
         REQUIRE(result.at(0).aggregate.sum == test_sample.value);
