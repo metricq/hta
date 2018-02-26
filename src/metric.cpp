@@ -180,7 +180,8 @@ void Metric::insert(Row row)
     level.advance({ row.end_time(), row.aggregate });
 }
 
-std::vector<TimeAggregate> Metric::retrieve_raw_time_aggregate(TimePoint begin, TimePoint end, IntervalScope scope)
+std::vector<TimeAggregate> Metric::retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
+                                                               IntervalScope scope)
 {
     auto result_tv = storage_metric_->get(begin, end, scope);
     std::vector<TimeAggregate> result;
@@ -230,5 +231,10 @@ std::vector<TimeAggregate> Metric::retrieve(TimePoint begin, TimePoint end, Dura
     } while (interval < interval_min_);
     // No data at all
     return {};
+}
+
+std::pair<TimePoint, TimePoint> Metric::range()
+{
+    return storage_metric_->range();
 }
 }

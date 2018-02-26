@@ -31,7 +31,7 @@ public:
                                                                              Scope::open });
     std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
                                     IntervalScope scope = { Scope::closed, Scope::extended });
-
+    std::pair<TimePoint, TimePoint> range();
 private:
     std::vector<TimeAggregate> retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
                                                            IntervalScope scope = IntervalScope{Scope::closed,
