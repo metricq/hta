@@ -186,7 +186,7 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     auto offset_end = end - epoch_;
 
     int64_t index_begin;
-    int64_t index_end;
+    int64_t index_end; // this point is **included** in the result!
     switch (scope.begin)
     {
     case Scope::closed:
@@ -221,6 +221,12 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
 
     index_begin = std::max<int64_t>(index_begin, 0);
     index_end = std::min<int64_t>(index_end, sz);
+
+    if (index_begin >= sz || index_end < 0)
+    {
+        return {};
+    }
+
     size_t count = index_end - index_begin + 1;
 
     std::vector<TimeAggregate> result(count);
