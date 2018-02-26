@@ -1,6 +1,6 @@
 #include <hta/directory.hpp>
 #include <hta/metric.hpp>
-#include <hta/my_filesystem.hpp>
+#include <hta/filesystem.hpp>
 
 #define CATCH_CONFIG_MAIN
 #include <catch/catch.hpp>
