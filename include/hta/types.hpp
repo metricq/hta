@@ -48,6 +48,15 @@ struct Aggregate
         return integral / active_time.count();
     }
 
+    Value mean() const
+    {
+        if (active_time.count())
+        {
+            return mean_integral();
+        }
+        return mean_sum();
+    }
+
     Aggregate& operator+=(Aggregate other);
 };
 
