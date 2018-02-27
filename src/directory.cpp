@@ -2,25 +2,31 @@
 
 #include <hta/directory.hpp>
 #include <hta/exception.hpp>
-#include <hta/metric.hpp>
 #include <hta/filesystem.hpp>
+#include <hta/metric.hpp>
 
 #include <nlohmann/json.hpp>
 
 #include <memory>
 #include <string>
 
-using json = nlohmann::json;
-
 namespace hta
 {
-Directory::Directory(const std::filesystem::path& config_path)
+
+using json = nlohmann::json;
+
+json read_json_from_file(const std::filesystem::path& path)
 {
     std::ifstream config_file;
     config_file.exceptions(std::ios::badbit | std::ios::failbit);
-    config_file.open(config_path);
+    config_file.open(path);
     json config;
     config_file >> config;
+    return config;
+}
+
+Directory::Directory(const json& config)
+{
     auto type = config["type"].get<std::string>();
     if (type == "file")
     {
@@ -30,6 +36,11 @@ Directory::Directory(const std::filesystem::path& config_path)
     {
         throw_exception("Unknown directory type: ", type);
     }
+}
+
+Directory::Directory(const std::filesystem::path& config_path)
+: Directory(read_json_from_file(config_path))
+{
 }
 
 ReadWriteMetric* Directory::operator[](const std::string& name)
