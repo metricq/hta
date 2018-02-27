@@ -99,13 +99,13 @@ public:
 
     value_type read(pos_type pos)
     {
-        stream_.seekg(data_begin_ + pos * value_size);
+        stream_.seekg(data_begin_ + static_cast<pos_type>(pos * value_size));
         return read<value_type>();
     }
 
     void read(std::vector<value_type>& vector, pos_type pos)
     {
-        stream_.seekg(data_begin_ + pos * value_size);
+        stream_.seekg(data_begin_ + static_cast<pos_type>(pos * value_size));
         read(vector);
     }
 
