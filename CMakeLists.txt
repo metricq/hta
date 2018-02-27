@@ -31,9 +31,10 @@ add_subdirectory(lib/json)
 set(hta_VERSION 0.0)
 
 set(SRCS
-    src/aggregate.cpp src/directory.cpp src/metric.cpp
+    src/aggregate.cpp src/directory.cpp
+    src/base_metric.cpp src/read_metric.cpp src/write_metric.cpp src/read_write_metric.cpp
     src/storage/file/directory.cpp src/storage/file/metric.cpp
-)
+    )
 
 add_library(hta ${SRCS})
 target_include_directories(hta

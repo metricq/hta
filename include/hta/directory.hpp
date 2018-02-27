@@ -7,7 +7,7 @@
 
 namespace hta
 {
-class Metric;
+class ReadWriteMetric;
 
 namespace storage
 {
@@ -18,11 +18,11 @@ class Directory
 {
 public:
     Directory(const std::filesystem::path& config_path);
-    Metric* operator[](const std::string& name);
+    ReadWriteMetric* operator[](const std::string& name);
     ~Directory();
 
 private:
     std::unique_ptr<storage::Directory> directory_;
-    std::unordered_map<std::string, std::unique_ptr<Metric>> metrics_;
+    std::unordered_map<std::string, std::unique_ptr<ReadWriteMetric>> metrics_;
 };
 }

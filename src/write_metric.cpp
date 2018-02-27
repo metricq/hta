@@ -1,51 +1,32 @@
+#include "level.hpp"
+
 #include "storage/metric.hpp"
 
 #include <hta/metric.hpp>
+#include <hta/types.hpp>
+
+#include <tuple>
 
 #include <cassert>
 
 namespace hta
 {
-class Level
+WriteMetric::WriteMetric()
 {
-public:
-    Level() = default;
-    Level(TimePoint time) : time_current(time)
-    {
-    }
+    // just to be sure that we are initialized properly
+    assert(storage_metric_);
+}
 
-    void advance(TimeValue tv)
-    {
-        assert(tv.time >= time_current);
-        auto duration = tv.time - time_current;
-        aggregate += { tv.value, duration };
-        time_current = tv.time;
-    }
-
-    void advance(TimeAggregate ta)
-    {
-        assert(ta.time >= time_current);
-        aggregate += ta.aggregate;
-        time_current = ta.time;
-    }
-
-    // The lowest level uses this for integrals
-    // For higher levels, this is only used for consistency checks and refers to the end
-    // of the most recent consumed row
-    TimePoint time_current;
-    Aggregate aggregate;
-};
-
-Metric::Metric(std::unique_ptr<storage::Metric> storage_metric)
-: storage_metric_(std::move(storage_metric))
+WriteMetric::~WriteMetric()
 {
 }
 
-Metric::~Metric()
+WriteMetric::WriteMetric(std::unique_ptr<storage::Metric> storage_metric)
+: BaseMetric(std::move(storage_metric))
 {
 }
 
-Level Metric::restore_level(Duration interval)
+Level WriteMetric::restore_level(Duration interval)
 {
     Level level;
     if (storage_metric_->size() == 0)
@@ -93,7 +74,7 @@ Level Metric::restore_level(Duration interval)
     return level;
 }
 
-Level& Metric::get_level(Duration interval)
+Level& WriteMetric::get_level(Duration interval)
 {
     auto it = levels_.find(interval);
     if (it == levels_.end())
@@ -104,7 +85,7 @@ Level& Metric::get_level(Duration interval)
     return it->second;
 }
 
-void Metric::insert(TimeValue tv)
+void WriteMetric::insert(TimeValue tv)
 {
     // Must not have an "invalid" time value... who knows what would happen...
     assert(tv.time);
@@ -144,7 +125,7 @@ void Metric::insert(TimeValue tv)
     level.advance(tv);
 }
 
-void Metric::insert(Row row)
+void WriteMetric::insert(Row row)
 {
     const auto interval = row.interval * interval_factor_;
     auto& level = get_level(interval);
@@ -178,63 +159,5 @@ void Metric::insert(Row row)
     }
 
     level.advance({ row.end_time(), row.aggregate });
-}
-
-std::vector<TimeAggregate> Metric::retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
-                                                               IntervalScope scope)
-{
-    auto result_tv = storage_metric_->get(begin, end, scope);
-    std::vector<TimeAggregate> result;
-    result.reserve(result_tv.size());
-    for (auto tv : result_tv)
-    {
-        result.push_back({ tv.time, Aggregate(tv.value) });
-    }
-    return result;
-}
-
-std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, IntervalScope scope)
-{
-    return storage_metric_->get(begin, end, scope);
-}
-
-std::vector<TimeAggregate> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
-                                            IntervalScope scope)
-{
-    assert(begin <= end);
-    auto duration = end - begin;
-    auto interval_max_length = duration / min_samples;
-    return retrieve(begin, end, interval_max_length, scope);
-}
-
-std::vector<TimeAggregate> Metric::retrieve(TimePoint begin, TimePoint end, Duration interval_max,
-                                            IntervalScope scope)
-{
-    if (interval_max < interval_min_)
-    {
-        return retrieve_raw_time_aggregate(begin, end, scope);
-    }
-    auto interval = interval_min_;
-    while (interval * interval_factor_ <= interval_max)
-    {
-        interval *= interval_factor_;
-    }
-    do
-    {
-        auto result = storage_metric_->get(begin, end, interval, scope);
-        if (result.size() > 0)
-        {
-            return result;
-        }
-        // If the requested level has no data yet, we must ask the lower levels
-        interval /= interval_factor_;
-    } while (interval < interval_min_);
-    // No data at all
-    return {};
-}
-
-std::pair<TimePoint, TimePoint> Metric::range()
-{
-    return storage_metric_->range();
 }
 }

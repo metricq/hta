@@ -16,13 +16,29 @@ namespace storage
 
 class Level;
 
-class Metric
+class BaseMetric
+{
+protected:
+    BaseMetric();
+    BaseMetric(std::unique_ptr<storage::Metric> storage_metric);
+    ~BaseMetric();
+
+protected:
+    // TODO make configurable
+    Duration interval_min_ = duration_cast(std::chrono::seconds(10));
+    uint64_t interval_factor_ = 10;
+    std::unique_ptr<storage::Metric> storage_metric_;
+};
+
+class ReadMetric : protected virtual BaseMetric
 {
 public:
-    Metric(std::unique_ptr<storage::Metric> storage_metric);
-    ~Metric();
+    ReadMetric(std::unique_ptr<storage::Metric> storage_metric);
 
-    void insert(TimeValue tv);
+protected:
+    ReadMetric();
+
+public:
     std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
                                         IntervalScope scope = IntervalScope{ Scope::extended,
                                                                              Scope::open });
@@ -32,19 +48,36 @@ public:
     std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
                                     IntervalScope scope = { Scope::closed, Scope::extended });
     std::pair<TimePoint, TimePoint> range();
+
 private:
     std::vector<TimeAggregate> retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
-                                                           IntervalScope scope = IntervalScope{Scope::closed,
-                                                                                               Scope::extended});
+                                                           IntervalScope scope = IntervalScope{
+                                                               Scope::closed, Scope::extended });
+};
 
+class WriteMetric : protected virtual BaseMetric
+{
+public:
+    WriteMetric(std::unique_ptr<storage::Metric> storage_metric);
+
+protected:
+    WriteMetric();
+    ~WriteMetric();
+
+public:
+    void insert(TimeValue tv);
+
+private:
     void insert(Row row);
     Level& get_level(Duration interval);
     Level restore_level(Duration interval);
 
     std::map<Duration, Level> levels_;
-    // TODO make configurable
-    Duration interval_min_ = duration_cast(std::chrono::seconds(10));
-    uint64_t interval_factor_ = 10;
-    std::unique_ptr<storage::Metric> storage_metric_;
+};
+
+class ReadWriteMetric : public ReadMetric, public WriteMetric
+{
+public:
+    ReadWriteMetric(std::unique_ptr<storage::Metric> storage_metric);
 };
 }

@@ -32,14 +32,14 @@ Directory::Directory(const std::filesystem::path& config_path)
     }
 }
 
-Metric* Directory::operator[](const std::string& name)
+ReadWriteMetric* Directory::operator[](const std::string& name)
 {
     auto it = metrics_.find(name);
     if (it == metrics_.end())
     {
         bool added;
         std::tie(it, added) =
-            metrics_.try_emplace(name, std::make_unique<Metric>((*directory_)[name]));
+            metrics_.try_emplace(name, std::make_unique<ReadWriteMetric>((*directory_)[name]));
         assert(added);
     }
     return it->second.get();
