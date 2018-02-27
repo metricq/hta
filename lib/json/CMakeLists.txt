@@ -1,4 +1,4 @@
-if(NOT EXISTS json::json)
+if(NOT TARGET json::json)
     add_library(json INTERFACE)
     target_include_directories(json INTERFACE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
@@ -17,5 +17,5 @@ if(NOT EXISTS json::json)
             FILE jsonTargets.cmake
             NAMESPACE json::
             DESTINATION lib/cmake/json
-            )
+    )
 endif()
