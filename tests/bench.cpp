@@ -22,6 +22,7 @@ void BM_insert(benchmark::State& state)
         // Remove leftovers from past runs
         std::filesystem::remove_all(test_pwd);
         auto created = std::filesystem::create_directories(test_pwd);
+        (void)created;
         assert(created);
         hta::Directory dir(config);
         auto metric = dir["foo"];
