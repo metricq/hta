@@ -50,7 +50,20 @@ ReadWriteMetric* Directory::operator[](const std::string& name)
     {
         bool added;
         std::tie(it, added) =
-            metrics_.try_emplace(name, std::make_unique<ReadWriteMetric>((*directory_)[name]));
+                metrics_.try_emplace(name, std::make_unique<ReadWriteMetric>((*directory_)[name]));
+        assert(added);
+    }
+    return it->second.get();
+}
+
+ReadMetric* Directory::read_metric(const std::string& name)
+{
+    auto it = read_metrics_.find(name);
+    if (it == read_metrics_.end())
+    {
+        bool added;
+        std::tie(it, added) =
+                read_metrics_.try_emplace(name, std::make_unique<ReadMetric>((*directory_)[name]));
         assert(added);
     }
     return it->second.get();
