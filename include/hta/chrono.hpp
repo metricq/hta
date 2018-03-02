@@ -24,7 +24,7 @@ struct Clock
         {
         }
 
-        operator bool() const
+        explicit operator bool() const
         {
             return time_since_epoch().count() != 0;
         }
