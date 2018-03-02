@@ -44,7 +44,7 @@ target_include_directories(hta
 )
 
 target_link_libraries(hta
-    PRIVATE
+    PUBLIC
         json::json
         std::filesystem
 )
