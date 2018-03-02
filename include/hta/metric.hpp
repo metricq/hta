@@ -24,9 +24,10 @@ protected:
     ~BaseMetric();
 
 protected:
+    std::unique_ptr<storage::Metric> storage_metric_;
+
     Duration interval_min_;
     uint64_t interval_factor_;
-    std::unique_ptr<storage::Metric> storage_metric_;
 };
 
 class ReadMetric : protected virtual BaseMetric

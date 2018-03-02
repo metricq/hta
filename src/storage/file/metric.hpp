@@ -16,7 +16,7 @@ namespace hta::storage::file
 {
 class Metric : public storage::Metric
 {
-private:
+public: // for the dump tool
     /*
      * Currently we write a bunch of stuff to the header, but don't actual support deviations.
      * Later versions of the code may support different time duration periods
@@ -71,7 +71,7 @@ public:
     {
     }
 
-    const Meta& meta() const override;
+    Meta meta() const override;
 
     void insert(TimeValue tv) override;
     void insert(Row row) override;

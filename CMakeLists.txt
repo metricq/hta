@@ -33,6 +33,7 @@ set(hta_VERSION 0.0)
 set(SRCS
     src/aggregate.cpp src/directory.cpp
     src/base_metric.cpp src/read_metric.cpp src/write_metric.cpp src/read_write_metric.cpp
+    src/meta.cpp
     src/storage/file/directory.cpp src/storage/file/metric.cpp
     )
 
@@ -52,6 +53,9 @@ target_link_libraries(hta
 target_compile_features(hta PUBLIC cxx_std_17)
 
 add_library(hta::hta ALIAS hta)
+
+add_executable(hta_dump src/tools/dump.cpp)
+target_link_libraries(hta_dump hta::hta)
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta

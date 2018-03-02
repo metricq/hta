@@ -5,10 +5,9 @@
 
 namespace hta::storage::file
 {
-const Meta& Metric::meta() const
+Meta Metric::meta() const
 {
-    return Meta{ .interval_min = Duration(file_raw_.header().interval_min),
-                 .interval_factor = file_raw_.header().interval_factor };
+    return Meta{ Duration(file_raw_.header().interval_min), file_raw_.header().interval_factor };
 }
 
 void Metric::insert(TimeValue tv)

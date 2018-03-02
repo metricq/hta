@@ -188,7 +188,8 @@ private:
         const auto header_size = read<uint64_t>();
         data_begin_ = header_begin_ + header_size;
 
-        auto read_size = std::min<size_t>(sizeof(header_), data_begin_ - header_begin_);
+        auto read_size =
+            std::min<size_t>(sizeof(header_), data_begin_ - static_cast<pos_type>(header_begin_));
         stream_.seekg(header_begin_);
         stream_.read(reinterpret_cast<char*>(&header_), read_size);
     }
@@ -196,7 +197,8 @@ private:
 private:
     std::fstream stream_;
     std::filesystem::path filename_;
-    static constexpr std::size_t header_begin_ =
+    // Apparently pos_type doesn't like to be constexpr m(
+    static constexpr size_type header_begin_ =
         magic_bytes.size() + sizeof(byte_order_mark) + sizeof(uint64_t);
     // Currently unsupported by code, but used in file format for future use
     static constexpr uint64_t alignment_ = 1;

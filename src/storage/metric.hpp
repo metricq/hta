@@ -1,22 +1,19 @@
 #pragma once
 
 #include <hta/types.hpp>
+#include <hta/meta.hpp>
 
 #include <cstdint>
 #include <vector>
 
 namespace hta::storage
 {
-struct Meta
-{
-    Duration interval_min = duration_cast(std::chrono::seconds(10));
-    int64_t interval_factor = 10;
-};
+class json;
 
 class Metric
 {
 public:
-    virtual const Meta& meta() const = 0;
+    virtual Meta meta() const = 0;
 
     virtual void insert(TimeValue tv) = 0;
     virtual void insert(Row row) = 0;

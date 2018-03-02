@@ -14,7 +14,7 @@ BaseMetric::BaseMetric()
 
 BaseMetric::BaseMetric(std::unique_ptr<storage::Metric> storage_metric)
 : storage_metric_(std::move(storage_metric)), interval_min_(storage_metric_->meta().interval_min),
-  interval_factor_(storage_metric->meta().interval_factor)
+  interval_factor_(storage_metric_->meta().interval_factor)
 {
 }
 
