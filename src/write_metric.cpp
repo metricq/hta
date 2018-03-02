@@ -133,7 +133,7 @@ void WriteMetric::insert(Row row)
     storage_metric_->insert(row);
     if (!level.time_current)
     {
-        level.time_current = row.end_time();
+        level.time_current = row.time;
     }
     else
     {
