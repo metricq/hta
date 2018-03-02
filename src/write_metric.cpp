@@ -160,4 +160,9 @@ void WriteMetric::insert(Row row)
 
     level.advance({ row.end_time(), row.aggregate });
 }
+
+void WriteMetric::flush()
+{
+    storage_metric_->flush();
+}
 }

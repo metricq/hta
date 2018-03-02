@@ -66,6 +66,7 @@ protected:
 
 public:
     void insert(TimeValue tv);
+    void flush();
 
 private:
     void insert(Row row);
