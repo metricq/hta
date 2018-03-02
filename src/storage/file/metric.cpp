@@ -93,13 +93,15 @@ uint64_t Metric::size(Duration interval)
     return file_hta(interval).size();
 }
 
-std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope scope)
+std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
+                                                 IntervalScope scope)
 {
     const auto sz = size();
     if (sz == 0)
     {
-        return {};
+        return { 0, 0 };
     }
+
     uint64_t index_begin;
     /* this is the index of the end _element_ (not after!) according to scope.end
      * It may be out of scope (==size()) in some cases */
@@ -145,16 +147,30 @@ std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope
         index_end = sz - 1;
         break;
     }
-
-    size_t count = index_end - index_begin;
+    // Move index_end to *after* the last included element... if not already outside.
     if (index_end < sz)
     {
-        // We include also the requested end element, but only if it's not outside the range
-        count++;
+        index_end++;
     }
-    std::vector<TimeValue> result(count);
+    return { index_begin, index_end };
+}
+
+std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope scope)
+{
+    auto[index_begin, index_end] = find_index(begin, end, scope);
+    if (index_begin == index_end)
+    {
+        return {};
+    }
+    std::vector<TimeValue> result(index_end - index_begin);
     file_raw().read(result, index_begin);
     return result;
+}
+
+size_t Metric::count(TimePoint begin, TimePoint end, IntervalScope scope)
+{
+    auto[index_begin, index_end] = find_index(begin, end, scope);
+    return index_end - index_begin;
 }
 
 TimePoint Metric::epoch()

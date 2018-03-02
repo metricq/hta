@@ -65,8 +65,10 @@ public:
     void flush() override;
 
     std::vector<TimeValue> get(TimePoint begin, TimePoint ebd, IntervalScope scope) override;
-    std::vector<TimeAggregate> get(TimePoint begin, TimePoint t1, Duration interval,
+    std::vector<TimeAggregate> get(TimePoint begin, TimePoint end, Duration interval,
                                    IntervalScope scope) override;
+
+    size_t count(TimePoint begin, TimePoint end, IntervalScope scope) override;
 
     TimeValue last() override;
     TimeAggregate last(Duration interval) override;
@@ -78,6 +80,8 @@ public:
 private:
     std::filesystem::path path_hta(Duration interval);
     std::filesystem::path path_raw();
+
+    std::pair<uint64_t, uint64_t> find_index(TimePoint begin, TimePoint end, IntervalScope scope);
 
     uint64_t find_index_before_or_on(TimePoint t, uint64_t left, uint64_t right);
     uint64_t find_index_on_or_after(TimePoint t, uint64_t left, uint64_t right);

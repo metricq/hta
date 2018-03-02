@@ -39,6 +39,11 @@ std::vector<TimeValue> ReadMetric::retrieve(TimePoint begin, TimePoint end, Inte
     return storage_metric_->get(begin, end, scope);
 }
 
+size_t ReadMetric::count(TimePoint begin, TimePoint end, IntervalScope scope)
+{
+    return storage_metric_->count(begin, end, scope);
+}
+
 std::vector<TimeAggregate> ReadMetric::retrieve(TimePoint begin, TimePoint end,
                                                 uint64_t min_samples, IntervalScope scope)
 {
