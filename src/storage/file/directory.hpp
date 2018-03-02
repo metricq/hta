@@ -28,7 +28,9 @@ class Directory : public storage::Directory
 {
 public:
     Directory(const std::filesystem::path& directory);
-    std::unique_ptr<storage::Metric> operator[](const std::string& name) override;
+    virtual std::unique_ptr<storage::Metric> open(const std::string& name,
+                                                  OpenMode mode = OpenMode::read_write,
+                                                  Meta meta = Meta()) override;
 
 private:
     const std::filesystem::path directory_;

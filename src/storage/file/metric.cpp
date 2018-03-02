@@ -5,10 +5,10 @@
 
 namespace hta::storage::file
 {
-
-Metric::Metric(const std::filesystem::path& path)
-: path_(path), file_raw_(FileOpenTag::ReadWrite(), path_raw(), Header(Duration(0)))
+const Meta& Metric::meta() const
 {
+    return Meta{ .interval_min = Duration(file_raw_.header().interval_min),
+                 .interval_factor = file_raw_.header().interval_factor };
 }
 
 void Metric::insert(TimeValue tv)
@@ -295,7 +295,7 @@ Metric::HtaFile& Metric::file_hta(Duration interval)
     {
         bool added;
         std::tie(it, added) = files_hta_.try_emplace(interval, FileOpenTag::ReadWrite(),
-                                                     path_hta(interval), Header(interval));
+                                                     path_hta(interval), Header(interval, meta()));
         assert(added);
     }
     return it->second;

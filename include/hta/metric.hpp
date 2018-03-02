@@ -24,9 +24,8 @@ protected:
     ~BaseMetric();
 
 protected:
-    // TODO make configurable
-    Duration interval_min_ = duration_cast(std::chrono::seconds(10));
-    uint64_t interval_factor_ = 10;
+    Duration interval_min_;
+    uint64_t interval_factor_;
     std::unique_ptr<storage::Metric> storage_metric_;
 };
 
@@ -61,10 +60,10 @@ class WriteMetric : protected virtual BaseMetric
 {
 public:
     WriteMetric(std::unique_ptr<storage::Metric> storage_metric);
+    ~WriteMetric();
 
 protected:
     WriteMetric();
-    ~WriteMetric();
 
 public:
     void insert(TimeValue tv);

@@ -19,7 +19,7 @@ namespace hta::storage::file
 
 namespace FileOpenTag
 {
-    class Create
+    class Write
     {
     };
     class Read
@@ -54,7 +54,7 @@ public:
     static_assert(std::is_trivially_copyable_v<T>, "T must be a trivially copyable.");
     static constexpr size_type value_size = sizeof(T);
 
-    File(FileOpenTag::Create, const std::filesystem::path& filename, const HeaderType& header)
+    File(FileOpenTag::Write, const std::filesystem::path& filename, const HeaderType& header)
     : File(filename, std::ios_base::trunc | std::ios_base::out)
     {
         write_preamble(header);
@@ -80,16 +80,13 @@ public:
         {
             stream_.seekg(0);
             read_preamble();
+            // TODO check compatibility of headers.
         }
     }
 
-    HeaderType read_header()
+    const HeaderType& header() const
     {
-        HeaderType header;
-        auto read_size = std::min<size_t>(sizeof(header), data_begin_ - header_begin_);
-        stream_.seekg(header_begin_);
-        stream_.read(reinterpret_cast<char*>(&header), read_size);
-        return header;
+        return header_;
     }
 
     void write(const value_type& thing)
@@ -169,6 +166,7 @@ private:
         assert(stream_.tellp() == data_begin_);
         flush();
         size();
+        header_ = header;
     }
 
     void read_preamble()
@@ -189,6 +187,10 @@ private:
 
         const auto header_size = read<uint64_t>();
         data_begin_ = header_begin_ + header_size;
+
+        auto read_size = std::min<size_t>(sizeof(header_), data_begin_ - header_begin_);
+        stream_.seekg(header_begin_);
+        stream_.read(reinterpret_cast<char*>(&header_), read_size);
     }
 
 private:
@@ -199,5 +201,6 @@ private:
     // Currently unsupported by code, but used in file format for future use
     static constexpr uint64_t alignment_ = 1;
     pos_type data_begin_;
+    HeaderType header_;
 };
 }

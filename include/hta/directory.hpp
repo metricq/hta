@@ -11,6 +11,7 @@ namespace hta
 using json = nlohmann::json;
 
 class ReadMetric;
+class WriteMetric;
 class ReadWriteMetric;
 
 namespace storage
@@ -29,7 +30,8 @@ public:
 
 private:
     std::unique_ptr<storage::Directory> directory_;
-    std::unordered_map<std::string, std::unique_ptr<ReadWriteMetric>> metrics_;
     std::unordered_map<std::string, std::unique_ptr<ReadMetric>> read_metrics_;
+    std::unordered_map<std::string, std::unique_ptr<WriteMetric>> write_metrics_;
+    std::unordered_map<std::string, std::unique_ptr<ReadWriteMetric>> read_write_metrics_;
 };
 }

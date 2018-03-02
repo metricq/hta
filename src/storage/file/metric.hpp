@@ -25,9 +25,10 @@ private:
     {
         Header() = default; // default C'tor for reading
 
-        Header(Duration interval)
+        Header(Duration interval, Meta meta)
         : version{ 1 }, interval{ interval.count() }, duration_period{ Duration::period::num,
-                                                                       Duration::period::den }
+                                                                       Duration::period::den },
+          interval_min{ meta.interval_min.count() }, interval_factor{ meta.interval_factor }
         {
         }
 
@@ -50,6 +51,8 @@ private:
             uint64_t num;
             uint64_t den;
         } duration_period;
+        int64_t interval_min;
+        int64_t interval_factor;
 
         // Only add stuff - don't change it
     };
@@ -57,7 +60,18 @@ private:
     using HtaFile = File<Header, TimeAggregate>;
 
 public:
-    Metric(const std::filesystem::path& path);
+    Metric(FileOpenTag::Read file_open_tag, const std::filesystem::path& path)
+    : path_(path), file_raw_(file_open_tag, path_raw())
+    {
+    }
+
+    template <typename FOT>
+    Metric(FOT file_open_tag, const std::filesystem::path& path, Meta meta)
+    : path_(path), file_raw_(file_open_tag, path_raw(), Header(Duration(0), meta))
+    {
+    }
+
+    const Meta& meta() const override;
 
     void insert(TimeValue tv) override;
     void insert(Row row) override;
