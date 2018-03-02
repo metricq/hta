@@ -9,7 +9,7 @@ namespace hta::storage::file
 {
 void dump_header(const std::filesystem::path& path)
 {
-    File<Metric::Header, char> file{ FileOpenTag::Read(), path };
+    File<Metric::Header, TimePoint> file{ FileOpenTag::Read(), path };
     auto header = file.header();
     std::cout << "HTA header of " << path << "\n";
     std::cout << "version: " << header.version << "\n";
@@ -19,7 +19,12 @@ void dump_header(const std::filesystem::path& path)
     std::cout << "interval_min: " << header.interval_min << "\n";
     std::cout << "interval_factor: " << header.interval_factor << "\n";
 
-    std::cout << file.size() << " bytes\n";
+    if (file.size() > 0)
+    {
+        std::cout << "first timestamp: " << file.read(0).time_since_epoch().count() << "\n";
+    }
+
+    std::cout << file.size() << " 8-byte values\n";
 }
 }
 
