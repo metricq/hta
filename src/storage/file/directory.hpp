@@ -28,9 +28,11 @@ class Directory : public storage::Directory
 {
 public:
     Directory(const std::filesystem::path& directory);
-    virtual std::unique_ptr<storage::Metric> open(const std::string& name,
-                                                  OpenMode mode = OpenMode::read_write,
-                                                  Meta meta = Meta()) override;
+    std::unique_ptr<storage::Metric> open(const std::string& name,
+                                          OpenMode mode = OpenMode::read_write,
+                                          Meta meta = Meta()) override;
+
+    std::vector<std::string> metric_names() override;
 
 private:
     const std::filesystem::path directory_;

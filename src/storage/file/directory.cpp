@@ -26,4 +26,18 @@ std::unique_ptr<storage::Metric> Directory::open(const std::string& name, OpenMo
         return std::make_unique<Metric>(FileOpenTag::ReadWrite(), path, meta);
     }
 }
+
+std::vector<std::string> Directory::metric_names()
+{
+    std::vector<std::string> result;
+    for (std::filesystem::path path : std::filesystem::directory_iterator(directory_))
+    {
+        if (std::filesystem::is_directory(path))
+        {
+            result.emplace_back(path.filename());
+        }
+    }
+    std::sort(result.begin(), result.end());
+    return result;
+}
 }

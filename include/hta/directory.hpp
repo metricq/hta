@@ -4,7 +4,9 @@
 
 #include <nlohmann/json_fwd.hpp>
 
+#include <string>
 #include <unordered_map>
+#include <vector>
 
 namespace hta
 {
@@ -24,9 +26,12 @@ class Directory
 public:
     Directory(const std::filesystem::path& config_path);
     Directory(const json& config);
+    ~Directory();
+
     ReadMetric* read_metric(const std::string& name);
     ReadWriteMetric* operator[](const std::string& name);
-    ~Directory();
+
+    std::vector<std::string> metric_names();
 
 private:
     std::unique_ptr<storage::Directory> directory_;

@@ -80,6 +80,11 @@ Directory::Directory(const std::filesystem::path& config_path)
 {
 }
 
+std::vector<std::string> Directory::metric_names()
+{
+    return directory_->metric_names();
+}
+
 ReadWriteMetric* Directory::operator[](const std::string& name)
 {
     auto it = read_write_metrics_.find(name);
