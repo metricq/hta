@@ -1,14 +1,16 @@
 #pragma once
 
+#include "../directory.hpp"
+
+#include <hta/exception.hpp>
+#include <hta/filesystem.hpp>
+
 #include <algorithm>
 #include <array>
 #include <fstream>
 #include <ios>
 #include <string>
 #include <type_traits>
-
-#include <hta/exception.hpp>
-#include <hta/filesystem.hpp>
 
 #include <cassert>
 #include <cerrno>
@@ -21,21 +23,43 @@ namespace hta::storage::file
 {
 namespace FileOpenTag
 {
-    class Write
+    struct Read
     {
+        static constexpr OpenMode mode = OpenMode::read;
     };
-    class Read
+    struct Write
     {
+        static constexpr OpenMode mode = OpenMode::write;
     };
-    class ReadWrite
+    struct ReadWrite
     {
+        static constexpr OpenMode mode = OpenMode::read_write;
     };
 }
 
-class Exception : hta::Exception
+class Exception : public hta::Exception
 {
 public:
-    using hta::Exception::Exception;
+    Exception(const std::string& message, const std::filesystem::path& filename, int error_number)
+    : hta::Exception(message + ": " + std::string(filename) + ": " + std::strerror(error_number)),
+      filename_(filename), errno_(error_number)
+    {
+    }
+    /**
+     * errno
+     */
+    int error_number() const
+    {
+        return errno_;
+    }
+    const std::filesystem::path& filename() const
+    {
+        return filename_;
+    }
+
+private:
+    std::filesystem::path filename_;
+    int errno_;
 };
 
 template <class HeaderType, class T>
@@ -64,16 +88,16 @@ private:
     }
 
 public:
-    File(FileOpenTag::Write, const std::filesystem::path& filename, const HeaderType& header)
-    : File(filename, std::ios_base::trunc | std::ios_base::out)
-    {
-        write_preamble(header);
-    }
-
     File(FileOpenTag::Read, const std::filesystem::path& filename)
     : File(filename, std::ios_base::in)
     {
         read_preamble();
+    }
+
+    File(FileOpenTag::Write, const std::filesystem::path& filename, const HeaderType& header)
+    : File(filename, std::ios_base::trunc | std::ios_base::out)
+    {
+        write_preamble(header);
     }
 
     File(FileOpenTag::ReadWrite, const std::filesystem::path& filename, const HeaderType& header)
@@ -220,6 +244,8 @@ private:
 
     // Get the char* because we might not need it and don't want to construct a temporary string
     // every time...
+    // TODO use the fancy make_exception and variable template parameters to build
+    // better error messages but lazy
     void check_stream(const char* message)
     {
         if (stream_.fail())
@@ -230,7 +256,7 @@ private:
 
     [[noreturn]] void raise_stream_error(const std::string& message)
     {
-        throw Exception(message + ": " + std::string(filename_) + ": " + std::strerror(errno));
+        throw Exception(message, filename_, errno);
     }
 
 private:

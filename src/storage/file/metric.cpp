@@ -192,7 +192,20 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
         return {};
     }
 
-    auto& file = file_hta(interval);
+    HtaFile* file;
+    try
+    {
+        file = &file_hta(interval);
+    }
+    catch (Exception& e)
+    {
+        if (e.error_number() == ENOENT)
+        {
+            // File does not exist... no data in this level
+            // TODO handle this somehow better with meta or so
+            return {};
+        }
+    }
 
     assert(end >= begin || scope.begin == Scope::infinity || scope.end == Scope::infinity);
 
@@ -245,7 +258,7 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     size_t count = index_end - index_begin + 1;
 
     std::vector<TimeAggregate> result(count);
-    file.read(result, index_begin);
+    file->read(result, index_begin);
 
 #ifndef NDEBUG
     // Check consistency of times
@@ -293,8 +306,21 @@ Metric::HtaFile& Metric::file_hta(Duration interval)
     if (it == files_hta_.end())
     {
         bool added;
-        std::tie(it, added) = files_hta_.try_emplace(interval, FileOpenTag::ReadWrite(),
-                                                     path_hta(interval), Header(interval, meta()));
+        switch (open_mode_)
+        {
+        case OpenMode::read:
+            std::tie(it, added) =
+                files_hta_.try_emplace(interval, FileOpenTag::Read(), path_hta(interval));
+            break;
+        case OpenMode::write:
+            std::tie(it, added) = files_hta_.try_emplace(
+                interval, FileOpenTag::Write(), path_hta(interval), Header(interval, meta()));
+            break;
+        case OpenMode::read_write:
+            std::tie(it, added) = files_hta_.try_emplace(
+                interval, FileOpenTag::ReadWrite(), path_hta(interval), Header(interval, meta()));
+            break;
+        }
         assert(added);
     }
     return it->second;

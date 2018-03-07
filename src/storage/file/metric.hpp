@@ -61,13 +61,14 @@ public: // for the dump tool
 
 public:
     Metric(FileOpenTag::Read file_open_tag, const std::filesystem::path& path)
-    : path_(path), file_raw_(file_open_tag, path_raw())
+    : open_mode_(file_open_tag.mode), path_(path), file_raw_(file_open_tag, path_raw())
     {
     }
 
     template <typename FOT>
     Metric(FOT file_open_tag, const std::filesystem::path& path, Meta meta)
-    : path_(path), file_raw_(file_open_tag, path_raw(), Header(Duration(0), meta))
+    : open_mode_(file_open_tag.mode), path_(path),
+      file_raw_(file_open_tag, path_raw(), Header(Duration(0), meta))
     {
     }
 
@@ -112,6 +113,8 @@ private:
 
     HtaFile& file_hta(Duration interval);
 
+private:
+    OpenMode open_mode_;
     std::filesystem::path path_;
     RawFile file_raw_;
     // TODO use better data structure to optimize accesses for lowest interval
