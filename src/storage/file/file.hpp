@@ -7,16 +7,18 @@
 #include <string>
 #include <type_traits>
 
+#include <hta/exception.hpp>
 #include <hta/filesystem.hpp>
 
 #include <cassert>
+#include <cerrno>
 #include <cstdint>
+#include <cstring>
 
 using namespace std::literals::string_literals;
 
 namespace hta::storage::file
 {
-
 namespace FileOpenTag
 {
     class Write
@@ -30,6 +32,12 @@ namespace FileOpenTag
     };
 }
 
+class Exception : hta::Exception
+{
+public:
+    using hta::Exception::Exception;
+};
+
 template <class HeaderType, class T>
 class File
 {
@@ -40,12 +48,6 @@ private:
     static constexpr uint64_t byte_order_mark = 0xf8f9fafbfcfdfeff;
     static_assert(std::is_pod_v<HeaderType>, "HeaderType must be a POD.");
 
-    File(const std::filesystem::path& filename, std::ios_base::openmode mode) : filename_(filename)
-    {
-        stream_.exceptions(std::ios::badbit | std::ios::failbit);
-        stream_.open(filename, mode | std::ios_base::binary);
-    }
-
 public:
     using pos_type = std::fstream::pos_type;
     using value_type = T;
@@ -54,6 +56,14 @@ public:
     static_assert(std::is_trivially_copyable_v<T>, "T must be a trivially copyable.");
     static constexpr size_type value_size = sizeof(T);
 
+private:
+    File(const std::filesystem::path& filename, std::ios_base::openmode mode)
+    : filename_(filename), stream_(filename, mode | std::ios_base::binary)
+    {
+        check_stream("open file");
+    }
+
+public:
     File(FileOpenTag::Write, const std::filesystem::path& filename, const HeaderType& header)
     : File(filename, std::ios_base::trunc | std::ios_base::out)
     {
@@ -72,6 +82,7 @@ public:
         // We need to use append mode otherwise it won't use O_CREAT.
         // Meanwhile app doesn't event seek to the end... oh my.
         stream_.seekp(0, stream_.end);
+        check_stream("seekp to end");
         if (stream_.tellp() == 0)
         {
             write_preamble(header);
@@ -79,6 +90,7 @@ public:
         else
         {
             stream_.seekg(0);
+            check_stream("seekg to begin");
             read_preamble();
             // TODO check compatibility of headers.
         }
@@ -92,28 +104,33 @@ public:
     void write(const value_type& thing)
     {
         stream_.write(reinterpret_cast<const char*>(&thing), value_size);
+        check_stream("write");
     }
 
     value_type read(pos_type pos)
     {
         stream_.seekg(data_begin_ + static_cast<pos_type>(pos * value_size));
+        check_stream("seekg for read");
         return read<value_type>();
     }
 
     void read(std::vector<value_type>& vector, pos_type pos)
     {
         stream_.seekg(data_begin_ + static_cast<pos_type>(pos * value_size));
+        check_stream("seekg for vector read");
         read(vector);
     }
 
     void flush()
     {
         stream_.flush();
+        check_stream("flush");
     }
 
     size_type size()
     {
         stream_.seekg(0, stream_.end);
+        check_stream("seekg to end for size");
         auto size_bytes = ssize_t(stream_.tellg()) - ssize_t(data_begin_);
         assert(size_bytes >= 0);
         assert(0 == size_bytes % value_size);
@@ -126,6 +143,7 @@ private:
     {
         static_assert(std::is_trivially_copyable_v<TT>, "Type must be a trivially copyable.");
         stream_.write(reinterpret_cast<const char*>(&thing), sizeof(thing));
+        check_stream("write");
     }
 
     template <typename TT>
@@ -134,15 +152,15 @@ private:
         static_assert(std::is_trivially_copyable_v<TT>, "Type must be a trivially copyable.");
         TT thing;
         stream_.read(reinterpret_cast<char*>(&thing), sizeof(thing));
+        check_stream("read");
         return thing;
     }
 
     void read(std::vector<value_type>& vec)
     {
         static_assert(std::is_trivially_copyable_v<T>, "T must be a POD.");
-        stream_.exceptions(std::ios::badbit);
         stream_.read(reinterpret_cast<char*>(vec.data()), value_size * vec.size());
-        if (stream_.eof())
+        if (stream_.rdstate() == (std::ios_base::failbit | std::ios_base::eofbit))
         {
             // how much did we actually read...
             auto count = stream_.gcount();
@@ -151,13 +169,17 @@ private:
             vec.resize(count / value_size);
             stream_.clear();
         }
-        stream_.exceptions(std::ios::badbit | std::ios::failbit);
+        else
+        {
+            check_stream("read vector");
+        }
     }
 
     void write_preamble(const HeaderType& header)
     {
         assert(stream_.tellp() == 0);
         stream_.write(magic_bytes.data(), magic_bytes.size());
+        check_stream("write magic bytes");
         write(byte_order_mark);
         uint64_t header_size = sizeof(header);
         write(header_size);
@@ -191,12 +213,29 @@ private:
         auto read_size =
             std::min<size_t>(sizeof(header_), data_begin_ - static_cast<pos_type>(header_begin_));
         stream_.seekg(header_begin_);
+        check_stream("seekg header");
         stream_.read(reinterpret_cast<char*>(&header_), read_size);
+        check_stream("read header");
+    }
+
+    // Get the char* because we might not need it and don't want to construct a temporary string
+    // every time...
+    void check_stream(const char* message)
+    {
+        if (stream_.fail())
+        {
+            raise_stream_error(std::string("failed to ") + message);
+        }
+    }
+
+    [[noreturn]] void raise_stream_error(const std::string& message)
+    {
+        throw Exception(message + ": " + std::string(filename_) + ": " + std::strerror(errno));
     }
 
 private:
-    std::fstream stream_;
     std::filesystem::path filename_;
+    std::fstream stream_;
     // Apparently pos_type doesn't like to be constexpr m(
     static constexpr size_type header_begin_ =
         magic_bytes.size() + sizeof(byte_order_mark) + sizeof(uint64_t);
