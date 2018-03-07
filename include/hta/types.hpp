@@ -60,6 +60,13 @@ struct Aggregate
     Aggregate& operator+=(Aggregate other);
 };
 
+inline Aggregate operator+(Aggregate left, Aggregate right)
+{
+    // taken by copy!
+    left += right;
+    return left;
+}
+
 struct TimeAggregate
 {
     TimeAggregate() = default;
@@ -74,6 +81,11 @@ struct Row
     : interval(interval), time(time), aggregate(aggregate)
     {
     }
+    Row(Duration interval, TimeAggregate ta)
+    : interval(interval), time(ta.time), aggregate(ta.aggregate)
+    {
+    }
+
     Duration interval;
     TimePoint time;
     Aggregate aggregate;
