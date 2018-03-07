@@ -205,6 +205,7 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
             // TODO handle this somehow better with meta or so
             return {};
         }
+        throw;
     }
 
     assert(end >= begin || scope.begin == Scope::infinity || scope.end == Scope::infinity);
