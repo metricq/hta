@@ -151,6 +151,11 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
     {
         index_end++;
     }
+
+    assert(index_begin < sz);
+    assert(index_end <= sz);
+    assert(index_begin <= index_end);
+
     return { index_begin, index_end };
 }
 
