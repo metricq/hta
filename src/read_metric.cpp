@@ -3,6 +3,7 @@
 #include <hta/metric.hpp>
 #include <hta/types.hpp>
 
+#include <algorithm>
 #include <utility>
 #include <vector>
 
@@ -21,15 +22,14 @@ ReadMetric::ReadMetric(std::unique_ptr<storage::Metric> storage_metric)
 {
 }
 
-std::vector<TimeAggregate> ReadMetric::retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
-                                                                   IntervalScope scope)
+std::vector<Row> ReadMetric::retrieve_raw_row(TimePoint begin, TimePoint end, IntervalScope scope)
 {
     auto result_tv = storage_metric_->get(begin, end, scope);
-    std::vector<TimeAggregate> result;
+    std::vector<Row> result;
     result.reserve(result_tv.size());
     for (auto tv : result_tv)
     {
-        result.push_back({ tv.time, Aggregate(tv.value) });
+        result.push_back({ Duration(0), tv.time, Aggregate(tv.value) });
     }
     return result;
 }
@@ -44,8 +44,8 @@ size_t ReadMetric::count(TimePoint begin, TimePoint end, IntervalScope scope)
     return storage_metric_->count(begin, end, scope);
 }
 
-std::vector<TimeAggregate> ReadMetric::retrieve(TimePoint begin, TimePoint end,
-                                                uint64_t min_samples, IntervalScope scope)
+std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
+                                      IntervalScope scope)
 {
     assert(begin <= end);
     auto duration = end - begin;
@@ -53,12 +53,12 @@ std::vector<TimeAggregate> ReadMetric::retrieve(TimePoint begin, TimePoint end,
     return retrieve(begin, end, interval_max_length, scope);
 }
 
-std::vector<TimeAggregate> ReadMetric::retrieve(TimePoint begin, TimePoint end,
-                                                Duration interval_max, IntervalScope scope)
+std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration interval_max,
+                                      IntervalScope scope)
 {
     if (interval_max < interval_min_)
     {
-        return retrieve_raw_time_aggregate(begin, end, scope);
+        return retrieve_raw_row(begin, end, scope);
     }
     auto interval = interval_min_;
     while (interval * interval_factor_ <= interval_max)
@@ -70,7 +70,13 @@ std::vector<TimeAggregate> ReadMetric::retrieve(TimePoint begin, TimePoint end,
         auto result = storage_metric_->get(begin, end, interval, scope);
         if (result.size() > 0)
         {
-            return result;
+            std::vector<Row> rows;
+            rows.reserve(result.size());
+            std::transform(result.begin(), result.end(), std::back_inserter(rows),
+                           [interval](TimeAggregate ta) -> Row {
+                               return { interval, ta };
+                           });
+            return rows;
         }
         // If the requested level has no data yet, we must ask the lower levels
         interval /= interval_factor_;

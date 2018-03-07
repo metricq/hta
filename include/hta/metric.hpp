@@ -39,12 +39,10 @@ protected:
     ReadMetric();
 
 public:
-    std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
-                                        IntervalScope scope = IntervalScope{ Scope::extended,
-                                                                             Scope::open });
-    std::vector<TimeAggregate> retrieve(TimePoint begin, TimePoint end, Duration interval_max,
-                                        IntervalScope scope = IntervalScope{ Scope::extended,
-                                                                             Scope::open });
+    std::vector<Row> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
+                              IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
+    std::vector<Row> retrieve(TimePoint begin, TimePoint end, Duration interval_max,
+                              IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
     std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
                                     IntervalScope scope = { Scope::closed, Scope::extended });
     size_t count(TimePoint begin, TimePoint end,
@@ -52,9 +50,9 @@ public:
     std::pair<TimePoint, TimePoint> range();
 
 private:
-    std::vector<TimeAggregate> retrieve_raw_time_aggregate(TimePoint begin, TimePoint end,
-                                                           IntervalScope scope = IntervalScope{
-                                                               Scope::closed, Scope::extended });
+    std::vector<Row> retrieve_raw_row(TimePoint begin, TimePoint end,
+                                                IntervalScope scope = IntervalScope{
+                                                        Scope::closed, Scope::extended});
 };
 
 class WriteMetric : protected virtual BaseMetric
