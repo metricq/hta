@@ -5,19 +5,19 @@
 
 namespace hta
 {
-std::ostream& operator<<(std::ostream& os, Duration duration)
+inline std::ostream& operator<<(std::ostream& os, Duration duration)
 {
     os << duration.count();
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, TimePoint tp)
+inline std::ostream& operator<<(std::ostream& os, TimePoint tp)
 {
     os << tp.time_since_epoch();
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const Aggregate& aggregate)
+inline std::ostream& operator<<(std::ostream& os, const Aggregate& aggregate)
 {
     os << "min: " << aggregate.minimum << ", max: " << aggregate.maximum
        << ", mean: " << aggregate.mean() << ", count: " << aggregate.count
@@ -25,7 +25,7 @@ std::ostream& operator<<(std::ostream& os, const Aggregate& aggregate)
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const Row& row)
+inline std::ostream& operator<<(std::ostream& os, const Row& row)
 {
     os << "[ " << row.time << " - " << row.end_time() << " ] (" << row.interval << ") "
        << row.aggregate;
