@@ -1,6 +1,6 @@
 #include <hta/directory.hpp>
-#include <hta/metric.hpp>
 #include <hta/filesystem.hpp>
+#include <hta/metric.hpp>
 
 #define CATCH_CONFIG_MAIN
 #include <catch/catch.hpp>
@@ -155,6 +155,12 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
             CHECK(result[1].aggregate.sum == 99 * 20.);
             CHECK(result[1].aggregate.maximum == 31.);
             CHECK(result[1].aggregate.minimum == 20.);
+        }
+        {
+            auto result = metric->retrieve(tp(15s), tp(15s), hta::duration_cast(10s));
+            REQUIRE(result.size() == 1);
+
+            CHECK(result[0].time == tp(10s));
         }
     }
 }
