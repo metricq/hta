@@ -3,6 +3,7 @@
 
 #include <hta/filesystem.hpp>
 
+#include <stdexcept>
 #include <string>
 
 namespace hta::storage::file
@@ -24,6 +25,8 @@ std::unique_ptr<storage::Metric> Directory::open(const std::string& name, OpenMo
         return std::make_unique<Metric>(FileOpenTag::Write(), path, meta);
     case OpenMode::read_write:
         return std::make_unique<Metric>(FileOpenTag::ReadWrite(), path, meta);
+    default:
+        throw std::logic_error("Unknown OpenMode");
     }
 }
 
@@ -40,4 +43,4 @@ std::vector<std::string> Directory::metric_names()
     std::sort(result.begin(), result.end());
     return result;
 }
-}
+} // namespace hta::storage::file
