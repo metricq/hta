@@ -25,6 +25,8 @@ if(NOT HAS_STD_FILESYSTEM)
     endif()
 else()
     set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_STD_FILESYSTEM)
+    # libstdc++ needs an extra lib for filesystem
+    set_target_properties(std::filesystem PROPERTIES INTERFACE_LINK_LIBRARIES stdc++fs)
 endif()
 
 add_subdirectory(lib/catch)
