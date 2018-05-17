@@ -191,7 +191,7 @@ TimePoint Metric::epoch(Duration interval)
 std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration interval,
                                        IntervalScope scope)
 {
-    auto sz = size();
+    auto sz = size(interval);
     if (sz == 0)
     {
         return {};
@@ -261,6 +261,7 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
         return {};
     }
 
+    assert(index_end >= index_begin);
     size_t count = index_end - index_begin + 1;
 
     std::vector<TimeAggregate> result(count);
