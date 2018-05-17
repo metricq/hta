@@ -161,7 +161,7 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
 
 std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope scope)
 {
-    auto[index_begin, index_end] = find_index(begin, end, scope);
+    auto [index_begin, index_end] = find_index(begin, end, scope);
     if (index_begin == index_end)
     {
         return {};
@@ -173,7 +173,7 @@ std::vector<TimeValue> Metric::get(TimePoint begin, TimePoint end, IntervalScope
 
 size_t Metric::count(TimePoint begin, TimePoint end, IntervalScope scope)
 {
-    auto[index_begin, index_end] = find_index(begin, end, scope);
+    auto [index_begin, index_end] = find_index(begin, end, scope);
     return index_end - index_begin;
 }
 
@@ -291,6 +291,10 @@ TimeAggregate Metric::last(Duration interval)
 
 std::pair<TimePoint, TimePoint> Metric::range()
 {
+    if (file_raw().size() == 0)
+    {
+        return { TimePoint(), TimePoint() };
+    }
     TimeValue first = file_raw().read(0);
     return { first.time, last().time };
 }
@@ -332,4 +336,4 @@ Metric::HtaFile& Metric::file_hta(Duration interval)
     }
     return it->second;
 }
-}
+} // namespace hta::storage::file
