@@ -59,7 +59,21 @@ target_compile_features(hta PUBLIC cxx_std_17)
 add_library(hta::hta ALIAS hta)
 
 add_executable(hta_dump src/tools/dump.cpp)
-target_link_libraries(hta_dump hta::hta)
+target_link_libraries(hta_dump PRIVATE hta::hta)
+
+find_package(MySQLConnectorCPP)
+if(MYSQLCONNECTORCPP_FOUND)
+    find_package(Boost REQUIRED COMPONENTS program_options system timer)
+    add_executable(hta_mysql_import src/tools/mysql_import.cpp)
+    target_link_libraries(hta_mysql_import PRIVATE hta::hta ${MYSQLCONNECTORCPP_LIBRARIES}
+            Boost::program_options Boost::system Boost::timer)
+    target_include_directories(hta_mysql_import PRIVATE ${MYSQLCONNECTORCPP_INCLUDE_DIRS})
+else()
+    message(STATUS "Will not build hta_mysql_import")
+endif()
+
+add_executable(hta_dummy src/tools/dummy.cpp)
+target_link_libraries(hta_dummy PRIVATE hta::hta)
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta
