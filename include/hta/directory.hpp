@@ -29,6 +29,7 @@ public:
     ~Directory();
 
     ReadMetric* read_metric(const std::string& name);
+    WriteMetric* write_metric(const std::string& name);
     ReadWriteMetric* operator[](const std::string& name);
 
     std::vector<std::string> metric_names();

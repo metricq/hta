@@ -45,7 +45,7 @@ Directory::Directory(const json& config)
             const auto& name = metric["name"];
             if (mode == "RW")
             {
-                auto[_, added] = read_write_metrics_.emplace(
+                auto [_, added] = read_write_metrics_.emplace(
                     metric["name"], std::make_unique<ReadWriteMetric>(directory_->open(
                                         name, storage::OpenMode::read_write, Meta(metric))));
                 assert(added);
@@ -53,7 +53,7 @@ Directory::Directory(const json& config)
             }
             else if (mode == "R")
             {
-                auto[_, added] = read_metrics_.emplace(
+                auto [_, added] = read_metrics_.emplace(
                     metric["name"], std::make_unique<ReadMetric>(directory_->open(
                                         name, storage::OpenMode::read, Meta(metric))));
                 assert(added);
@@ -61,7 +61,7 @@ Directory::Directory(const json& config)
             }
             else if (mode == "W")
             {
-                auto[_, added] = write_metrics_.emplace(
+                auto [_, added] = write_metrics_.emplace(
                     metric["name"], std::make_unique<WriteMetric>(directory_->open(
                                         name, storage::OpenMode::write, Meta(metric))));
                 assert(added);
@@ -112,7 +112,20 @@ ReadMetric* Directory::read_metric(const std::string& name)
     return it->second.get();
 }
 
+WriteMetric* Directory::write_metric(const std::string& name)
+{
+    auto it = write_metrics_.find(name);
+    if (it == write_metrics_.end())
+    {
+        bool added;
+        std::tie(it, added) = write_metrics_.try_emplace(
+            name, std::make_unique<WriteMetric>(directory_->open(name, storage::OpenMode::write)));
+        assert(added);
+    }
+    return it->second.get();
+}
+
 Directory::~Directory()
 {
 }
-}
+} // namespace hta
