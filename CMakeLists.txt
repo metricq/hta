@@ -75,6 +75,9 @@ endif()
 add_executable(hta_dummy src/tools/dummy.cpp)
 target_link_libraries(hta_dummy PRIVATE hta::hta)
 
+add_executable(hta_repair src/tools/repair.cpp)
+target_link_libraries(hta_repair PRIVATE hta::hta)
+
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta
         INTERFACE
