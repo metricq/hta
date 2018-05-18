@@ -22,11 +22,13 @@ void dump_header(const std::filesystem::path& path)
     if (file.size() > 0)
     {
         std::cout << "first timestamp: " << file.read(0).time_since_epoch().count() << "\n";
+        std::cout << "last timestamp: " << file.read(file.size() - 1).time_since_epoch().count()
+                  << "\n";
     }
 
     std::cout << file.size() << " 8-byte values\n";
 }
-}
+} // namespace hta::storage::file
 
 int main(int argc, char* argv[])
 {
