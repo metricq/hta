@@ -3,12 +3,27 @@
 
 #include <hta/ostream.hpp>
 
+#include <boost/program_options.hpp>
 #include <iostream>
 
 #include <cassert>
 
+namespace po = boost::program_options;
+
 namespace hta::storage::file
 {
+template <class T>
+void dump_summary(const std::filesystem::path& path)
+{
+    File<Metric::Header, T> file{ FileOpenTag::Read(), path };
+    if (file.size() > 0)
+    {
+        std::cout << "first timestamp: " << file.read(0).time << "\n";
+        std::cout << "last timestamp " << file.read(file.size() - 1).time << "\n";
+    }
+    std::cout << file.size() << " entries\n";
+}
+
 void dump_header(const std::filesystem::path& path)
 {
     bool is_raw;
@@ -26,25 +41,13 @@ void dump_header(const std::filesystem::path& path)
     }
     if (is_raw)
     {
-        File<Metric::Header, TimeValue> file{ FileOpenTag::Read(), path };
-        if (file.size() > 0)
-        {
-            std::cout << "first timestamp: " << file.read(0).time << "\n";
-            std::cout << "last timestamp " << file.read(file.size() - 1).time << "\n";
-        }
-        std::cout << file.size() << " raw values\n";
+        std::cout << "File contains raw TimeValue\n";
+        dump_summary<TimeValue>(path);
     }
     else
     {
-        {
-            File<Metric::Header, TimeAggregate> file{ FileOpenTag::Read(), path };
-            if (file.size() > 0)
-            {
-                std::cout << "first timestamp: " << file.read(0).time << "\n";
-                std::cout << "last timestamp " << file.read(file.size() - 1).time << "\n";
-            }
-            std::cout << file.size() << " aggregate values\n";
-        }
+        std::cout << "File contains TimeAggregate\n";
+        dump_summary<TimeAggregate>(path);
     }
 }
 } // namespace hta::storage::file
