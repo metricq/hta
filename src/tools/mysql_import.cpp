@@ -1,4 +1,5 @@
 #include <hta/hta.hpp>
+#include <hta/ostream.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -8,12 +9,27 @@
 #include <mysql_driver.h>
 
 #include <boost/program_options.hpp>
-#include <boost/property_tree/json_parser.hpp>
-#include <boost/property_tree/ptree.hpp>
 #include <boost/timer/timer.hpp>
+
+#include <filesystem>
+#include <fstream>
+#include <iostream>
+
+extern "C"
+{
+#include <signal.h>
+}
 
 namespace po = boost::program_options;
 using json = nlohmann::json;
+
+volatile sig_atomic_t stop_requested = 0;
+
+void handle_signal(int)
+{
+    std::cout << "cought sigint, requesting stop.";
+    stop_requested = 1;
+}
 
 json read_json_from_file(const std::filesystem::path& path)
 {
@@ -39,7 +55,7 @@ size_t stream_query(sql::Connection& db, const std::string& query, L cb,
         {
             cb(*res);
         }
-        if (res->rowsCount() != chunk_size)
+        if (res->rowsCount() != chunk_size || stop_requested)
         {
             return offset + res->rowsCount();
         }
@@ -64,18 +80,26 @@ void import(sql::Connection& in_db, hta::Directory& out_directory, const std::st
         where += " WHERE timestamp >= '" + std::to_string(min_timestamp) + "' AND timestamp <= '" +
                  std::to_string(max_timestamp) + "'";
     }
+    hta::TimePoint previouse_time;
     auto r =
         stream_query(in_db, "SELECT timestamp, value FROM " + metric_name + where,
-                     [&row, &out_metric](const auto& result) {
+                     [&row, &out_metric, &previouse_time](const auto& result) {
+                         row++;
                          if (row % 1000000 == 0)
                          {
                              std::cout << row << " rows completed." << std::endl;
                          }
+                         hta::TimePoint hta_time{ hta::duration_cast(
+                             std::chrono::milliseconds(result.getUInt64(1))) };
+                         if (hta_time <= previouse_time)
+                         {
+                             std::cout << "Skipping non-monotonous timestamp " << hta_time
+                                       << std::endl;
+                             return;
+                         }
+
                          // Note: Dataheap uses milliseconds. We use nanoseconds.
-                         out_metric->insert({ hta::TimePoint(hta::duration_cast(
-                                                  std::chrono::milliseconds(result.getUInt64(1)))),
-                                              static_cast<double>(result.getDouble(2)) });
-                         row++;
+                         out_metric->insert({ hta_time, static_cast<double>(result.getDouble(2)) });
                      });
     out_metric->flush();
     std::cout << "Imported " << row << " / " << r << " rows for metric: " << metric_name << "\n";
@@ -124,5 +148,6 @@ int main(int argc, char* argv[])
     std::unique_ptr<sql::Connection> con(driver->connect(host, user, password));
     con->setSchema(schema);
 
+    std::cout.imbue(std::locale(""));
     import(*con, out_directory, metric_name, min_timestamp, max_timestamp);
 }
