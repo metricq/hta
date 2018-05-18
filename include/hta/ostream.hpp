@@ -10,15 +10,14 @@ inline std::ostream& operator<<(std::ostream& os, hta::Duration duration)
     os << duration.count();
     return os;
 }
-
+} // namespace std
+namespace hta
+{
 inline std::ostream& operator<<(std::ostream& os, hta::TimePoint tp)
 {
     os << tp.time_since_epoch();
     return os;
 }
-}
-namespace hta
-{
 inline std::ostream& operator<<(std::ostream& os, const Aggregate& aggregate)
 {
     os << "min: " << aggregate.minimum << ", max: " << aggregate.maximum
@@ -33,4 +32,4 @@ inline std::ostream& operator<<(std::ostream& os, const Row& row)
        << row.aggregate;
     return os;
 }
-}
+} // namespace hta
