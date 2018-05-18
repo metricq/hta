@@ -61,6 +61,9 @@ add_library(hta::hta ALIAS hta)
 find_package(Boost COMPONENTS program_options system timer)
 
 if(Boost_FOUND)
+    add_executable(hta_check src/tools/check.cpp)
+    target_link_libraries(hta_check PRIVATE hta::hta)
+
     add_executable(hta_dummy src/tools/dummy.cpp)
     target_link_libraries(hta_dummy PRIVATE hta::hta)
 
