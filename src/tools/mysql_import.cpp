@@ -97,7 +97,7 @@ void import(sql::Connection& in_db, hta::Directory& out_directory, const std::st
                                        << std::endl;
                              return;
                          }
-
+                         previouse_time = hta_time;
                          // Note: Dataheap uses milliseconds. We use nanoseconds.
                          out_metric->insert({ hta_time, static_cast<double>(result.getDouble(2)) });
                      });
@@ -149,5 +149,6 @@ int main(int argc, char* argv[])
     con->setSchema(schema);
 
     std::cout.imbue(std::locale(""));
+    signal(SIGINT, handle_signal);
     import(*con, out_directory, metric_name, min_timestamp, max_timestamp);
 }
