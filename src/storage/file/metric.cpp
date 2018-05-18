@@ -12,6 +12,7 @@ Meta Metric::meta() const
 
 void Metric::insert(TimeValue tv)
 {
+
     file_raw().write(tv);
 }
 

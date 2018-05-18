@@ -28,6 +28,8 @@ protected:
 
     Duration interval_min_;
     uint64_t interval_factor_;
+
+    TimePoint previous_time_;
 };
 
 class ReadMetric : protected virtual BaseMetric

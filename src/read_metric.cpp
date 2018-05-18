@@ -15,11 +15,13 @@ ReadMetric::ReadMetric()
 {
     // just to be sure that we are initialized properly
     assert(storage_metric_);
+    previous_time_ = storage_metric_->range().second;
 }
 
 ReadMetric::ReadMetric(std::unique_ptr<storage::Metric> storage_metric)
 : BaseMetric(std::move(storage_metric))
 {
+    previous_time_ = storage_metric_->range().second;
 }
 
 std::vector<Row> ReadMetric::retrieve_raw_row(TimePoint begin, TimePoint end, IntervalScope scope)
@@ -94,4 +96,4 @@ std::pair<TimePoint, TimePoint> ReadMetric::range()
 {
     return storage_metric_->range();
 }
-}
+} // namespace hta

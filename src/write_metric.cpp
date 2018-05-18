@@ -5,6 +5,7 @@
 #include <hta/metric.hpp>
 #include <hta/types.hpp>
 
+#include <stdexcept>
 #include <tuple>
 
 #include <cassert>
@@ -87,8 +88,19 @@ Level& WriteMetric::get_level(Duration interval)
 
 void WriteMetric::insert(TimeValue tv)
 {
+    // Evaluate if these two consistency checks hurt performance
     // Must not have an "invalid" time value... who knows what would happen...
-    assert(tv.time);
+    if (!tv.time)
+    {
+        throw std::out_of_range("cannot insert invalid (0) hta::TimePoint");
+    }
+    if (tv.time < previous_time_)
+    {
+        throw std::out_of_range("trying to add non-monotonic timestamp; previous " +
+                                std::to_string(previous_time_.time_since_epoch().count()) +
+                                " new " + std::to_string(tv.time.time_since_epoch().count()));
+    }
+    previous_time_ = tv.time;
 
     const auto interval = interval_min_;
     auto& level = get_level(interval);
@@ -165,4 +177,4 @@ void WriteMetric::flush()
 {
     storage_metric_->flush();
 }
-}
+} // namespace hta
