@@ -3,20 +3,22 @@
 #include "hta.hpp"
 #include <ostream>
 
-namespace hta
+namespace std
 {
-inline std::ostream& operator<<(std::ostream& os, Duration duration)
+inline std::ostream& operator<<(std::ostream& os, hta::Duration duration)
 {
     os << duration.count();
     return os;
 }
 
-inline std::ostream& operator<<(std::ostream& os, TimePoint tp)
+inline std::ostream& operator<<(std::ostream& os, hta::TimePoint tp)
 {
     os << tp.time_since_epoch();
     return os;
 }
-
+}
+namespace hta
+{
 inline std::ostream& operator<<(std::ostream& os, const Aggregate& aggregate)
 {
     os << "min: " << aggregate.minimum << ", max: " << aggregate.maximum
