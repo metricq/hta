@@ -157,7 +157,9 @@ public:
         check_stream("seekg to end for size");
         auto size_bytes = ssize_t(stream_.tellg()) - ssize_t(data_begin_);
         assert(size_bytes >= 0);
-        assert(0 == size_bytes % value_size);
+        // A file that is written in the background may have incomple records
+        // during flush. It is useful to allow reading such a file.
+        // assert(0 == size_bytes % value_size);
         return size_bytes / value_size;
     }
 
