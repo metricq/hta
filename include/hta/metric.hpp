@@ -47,6 +47,7 @@ public:
                                     IntervalScope scope = { Scope::closed, Scope::extended });
     size_t count(TimePoint begin, TimePoint end,
                  IntervalScope scope = { Scope::closed, Scope::extended });
+    size_t count();
     std::pair<TimePoint, TimePoint> range();
 
 private:

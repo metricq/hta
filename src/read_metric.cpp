@@ -44,6 +44,11 @@ size_t ReadMetric::count(TimePoint begin, TimePoint end, IntervalScope scope)
     return storage_metric_->count(begin, end, scope);
 }
 
+size_t ReadMetric::count()
+{
+    return storage_metric_->size();
+}
+
 std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
                                       IntervalScope scope)
 {
