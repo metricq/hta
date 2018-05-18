@@ -26,20 +26,16 @@ void dump_summary(const std::filesystem::path& path)
 
 void dump_header(const std::filesystem::path& path)
 {
-    bool is_raw;
-    {
-        File<Metric::Header, TimePoint> file{ FileOpenTag::Read(), path };
-        auto header = file.header();
-        std::cout << "HTA header of " << path << "\n";
-        std::cout << "version: " << header.version << "\n";
-        std::cout << "interval: " << header.interval << "\n";
-        std::cout << "duration_period: " << header.duration_period.num << " / "
-                  << header.duration_period.den << "\n";
-        std::cout << "interval_min: " << header.interval_min << "\n";
-        std::cout << "interval_factor: " << header.interval_factor << "\n";
-        is_raw = (header.interval == 0);
-    }
-    if (is_raw)
+    File<Metric::Header, TimePoint> file{ FileOpenTag::Read(), path };
+    auto header = file.header();
+    std::cout << "HTA header of " << path << "\n";
+    std::cout << "version: " << header.version << "\n";
+    std::cout << "interval: " << header.interval << "\n";
+    std::cout << "duration_period: " << header.duration_period.num << " / "
+              << header.duration_period.den << "\n";
+    std::cout << "interval_min: " << header.interval_min << "\n";
+    std::cout << "interval_factor: " << header.interval_factor << "\n";
+    if (header.interval == 0)
     {
         std::cout << "File contains raw TimeValue\n";
         dump_summary<TimeValue>(path);
