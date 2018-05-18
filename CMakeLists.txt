@@ -58,25 +58,30 @@ target_compile_features(hta PUBLIC cxx_std_17)
 
 add_library(hta::hta ALIAS hta)
 
-add_executable(hta_dump src/tools/dump.cpp)
-target_link_libraries(hta_dump PRIVATE hta::hta)
+find_package(Boost COMPONENTS program_options system timer)
+
+if(Boost_FOUND)
+    add_executable(hta_dummy src/tools/dummy.cpp)
+    target_link_libraries(hta_dummy PRIVATE hta::hta)
+
+    add_executable(hta_dump src/tools/dump.cpp)
+    target_link_libraries(hta_dump PRIVATE hta::hta)
+
+    add_executable(hta_repair src/tools/repair.cpp)
+    target_link_libraries(hta_repair PRIVATE hta::hta)
+else()
+    message(STATUS "Will not build hta_dummy, hta_dump, hta_repair missing boost")
+endif()
 
 find_package(MySQLConnectorCPP)
-if(MYSQLCONNECTORCPP_FOUND)
-    find_package(Boost REQUIRED COMPONENTS program_options system timer)
+if(MYSQLCONNECTORCPP_FOUND AND Boost_FOUND)
     add_executable(hta_mysql_import src/tools/mysql_import.cpp)
     target_link_libraries(hta_mysql_import PRIVATE hta::hta ${MYSQLCONNECTORCPP_LIBRARIES}
             Boost::program_options Boost::system Boost::timer)
     target_include_directories(hta_mysql_import PRIVATE ${MYSQLCONNECTORCPP_INCLUDE_DIRS})
 else()
-    message(STATUS "Will not build hta_mysql_import")
+    message(STATUS "Will not build hta_mysql_import, missing boost and/or mysql-connector-c++")
 endif()
-
-add_executable(hta_dummy src/tools/dummy.cpp)
-target_link_libraries(hta_dummy PRIVATE hta::hta)
-
-add_executable(hta_repair src/tools/repair.cpp)
-target_link_libraries(hta_repair PRIVATE hta::hta)
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta
