@@ -87,7 +87,7 @@ std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration i
         }
         // If the requested level has no data yet, we must ask the lower levels
         interval /= interval_factor_;
-    } while (interval < interval_min_);
+    } while (interval >= interval_min_);
     // No data at all
     return {};
 }
