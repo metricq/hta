@@ -158,7 +158,7 @@ int main(int argc, char* argv[])
         "import,i", po::value(&in_db_name), "name of input database config (default \"import\").")(
         "min-timestamp", po::value(&min_timestamp), "minimal timestamp for dump, in unix-ms")(
         "max-timestamp", po::value(&max_timestamp), "maximal timestamp for dump, in unix-ms")(
-        "auto-interval", po::value(&auto_interval), "automatically select an interval");
+        "auto-interval", po::bool_switch(&auto_interval), "automatically select an interval");
 
     std::string in_metric_name = metric_name;
     std::string out_metric_name = metric_name;
