@@ -135,7 +135,7 @@ void select_interval(sql::Connection& con, json& metric_config, const std::strin
     metric_config["interval_min"] = interval_min;
 
     std::cout << "Total count: " << count << "\n";
-    std::cout << "Timestamp range: " <<  db_min_timestamp << " - " << db_max_timestamp << "\n";
+    std::cout << "Timestamp range: " << db_min_timestamp << " - " << db_max_timestamp << "\n";
     std::cout << "Average interval " << average_interval_ns << "ns.\n";
     std::cout << "Interval factor: " << interval_factor << "\n";
     std::cout << "Determined interval_min of " << interval_min << "\n";
@@ -176,6 +176,9 @@ int main(int argc, char* argv[])
     std::string out_metric_name = metric_name;
     std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
     std::replace(out_metric_name.begin(), out_metric_name.end(), '_', '.');
+
+    std::cout << "Using import metric name: " << in_metric_name
+              << ", hta metric name: " << out_metric_name << "\n";
 
     auto config = read_json_from_file(std::filesystem::path(config_file));
 
