@@ -134,6 +134,8 @@ void select_interval(sql::Connection& con, json& metric_config, const std::strin
         interval_factor, std::ceil(std::log(average_interval_ns) / std::log(interval_factor)) + 1));
     metric_config["interval_min"] = interval_min;
 
+    std::cout << "Total count: " << count << "\n";
+    std::cout << "Timestamp range: " <<  db_min_timestamp << " - " << db_max_timestamp << "\n";
     std::cout << "Average interval " << average_interval_ns << "ns.\n";
     std::cout << "Interval factor: " << interval_factor << "\n";
     std::cout << "Determined interval_min of " << interval_min << "\n";
