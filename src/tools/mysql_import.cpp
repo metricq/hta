@@ -132,7 +132,7 @@ void select_interval(sql::Connection& con, json& metric_config, const std::strin
     }
     int64_t interval_min = std::llround(
         std::pow(interval_factor,
-                 std::ceil(0.8 * std::log(average_interval_ns) / std::log(interval_factor)) + 1));
+                 std::ceil(std::log(0.8 * average_interval_ns) / std::log(interval_factor)) + 1));
     metric_config["interval_min"] = interval_min;
 
     std::cout << "Total count: " << count << "\n";
