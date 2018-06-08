@@ -66,7 +66,7 @@ size_t stream_query(sql::Connection& db, const std::string& query, L cb,
 }
 
 void import(sql::Connection& in_db, hta::Directory& out_directory,
-            const std::string& out_metric_name, const std::string& in_metric_name,
+            const std::string& in_metric_name, const std::string& out_metric_name,
             uint64_t min_timestamp, uint64_t max_timestamp)
 {
     auto out_metric = out_directory[out_metric_name];
