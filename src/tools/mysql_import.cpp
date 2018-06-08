@@ -172,6 +172,7 @@ int main(int argc, char* argv[])
         return 0;
     };
 
+    std::cout.imbue(std::locale(""));
     std::string in_metric_name = metric_name;
     std::string out_metric_name = metric_name;
     std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
@@ -199,7 +200,6 @@ int main(int argc, char* argv[])
 
     hta::Directory out_directory(config);
 
-    std::cout.imbue(std::locale(""));
     signal(SIGINT, handle_signal);
     import(*con, out_directory, in_metric_name, out_metric_name, min_timestamp, max_timestamp);
 }
