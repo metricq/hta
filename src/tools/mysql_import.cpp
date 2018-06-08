@@ -162,11 +162,6 @@ int main(int argc, char* argv[])
         "max-timestamp", po::value(&max_timestamp), "maximal timestamp for dump, in unix-ms")(
         "auto-interval", po::bool_switch(&auto_interval), "automatically select an interval");
 
-    std::string in_metric_name = metric_name;
-    std::string out_metric_name = metric_name;
-    std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
-    std::replace(out_metric_name.begin(), out_metric_name.end(), '_', '.');
-
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
@@ -176,6 +171,12 @@ int main(int argc, char* argv[])
         std::cout << desc << "\n";
         return 0;
     };
+
+    std::string in_metric_name = metric_name;
+    std::string out_metric_name = metric_name;
+    std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
+    std::replace(out_metric_name.begin(), out_metric_name.end(), '_', '.');
+
     auto config = read_json_from_file(std::filesystem::path(config_file));
 
     // setup input / import database
