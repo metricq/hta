@@ -89,7 +89,7 @@ endif()
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta
         INTERFACE
-            -Wall -Wextra -pedantic
+            -Wall -Wextra -pedantic -Wsign-compare
     )
 
     install(DIRECTORY
