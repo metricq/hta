@@ -114,26 +114,25 @@ void import(sql::Connection& in_db, hta::Directory& out_directory,
                  std::to_string(max_timestamp) + "'";
     }
     hta::TimePoint previous_time;
-    auto r =
-        stream_query(in_db, "SELECT timestamp, value FROM " + in_metric_name + where,
-                     [&row, &out_metric, &previous_time](const auto& result) {
-                         row++;
-                         if (row % 1000000 == 0)
-                         {
-                             std::cout << row << " rows completed." << std::endl;
-                         }
-                         hta::TimePoint hta_time{ hta::duration_cast(
-                             std::chrono::milliseconds(result.getUInt64(1))) };
-                         if (hta_time <= previous_time)
-                         {
-                             std::cout << "Skipping non-monotonous timestamp " << hta_time
-                                       << std::endl;
-                             return;
-                         }
-                         previous_time = hta_time;
-                         // Note: Dataheap uses milliseconds. We use nanoseconds.
-                         out_metric->insert({ hta_time, static_cast<double>(result.getDouble(2)) });
-                     });
+    auto r = stream_query(
+        in_db, "SELECT timestamp, value FROM " + in_metric_name + where + " ORDER BY timestamp ASC",
+        [&row, &out_metric, &previous_time](const auto& result) {
+            row++;
+            if (row % 1000000 == 0)
+            {
+                std::cout << row << " rows completed." << std::endl;
+            }
+            hta::TimePoint hta_time{ hta::duration_cast(
+                std::chrono::milliseconds(result.getUInt64(1))) };
+            if (hta_time <= previous_time)
+            {
+                std::cout << "Skipping non-monotonous timestamp " << hta_time << std::endl;
+                return;
+            }
+            previous_time = hta_time;
+            // Note: Dataheap uses milliseconds. We use nanoseconds.
+            out_metric->insert({ hta_time, static_cast<double>(result.getDouble(2)) });
+        });
     out_metric->flush();
     std::cout << "Imported " << row << " / " << r << " rows for metric: " << out_metric_name
               << "\n";
@@ -231,7 +230,7 @@ int main(int argc, char* argv[])
             {
                 select_interval(*con, metric_config, in_metric_name);
             }
-            config["metrics"] = json::array({metric_config});
+            config["metrics"] = json::array({ metric_config });
             break;
         }
     }
