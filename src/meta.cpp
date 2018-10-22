@@ -45,5 +45,9 @@ Meta::Meta(const json& config)
     {
         interval_factor = config["interval_factor"];
     }
+    if (config.count("interval_max"))
+    {
+        interval_max = Duration(config["interval_max"]);
+    }
 }
 } // namespace hta

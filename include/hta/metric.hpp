@@ -105,6 +105,7 @@ protected:
     std::unique_ptr<storage::Metric> storage_metric_;
 
     Duration interval_min_;
+    Duration interval_max_;
     IntervalFactor interval_factor_;
 
     TimePoint previous_time_;

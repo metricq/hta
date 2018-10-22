@@ -42,13 +42,14 @@ struct Meta
 {
     // TODO try to delete the default constructor.
     Meta() = default;
-    Meta(Duration interval_min, int64_t interval_factor)
-    : interval_min(interval_min), interval_factor(interval_factor)
+    Meta(Duration interval_min, Duration interval_max, int64_t interval_factor)
+    : interval_min(interval_min), interval_max(interval_max), interval_factor(interval_factor)
     {
     }
     Meta(const json& config);
 
     Duration interval_min = duration_cast(std::chrono::seconds(10));
+    Duration interval_max = duration_cast(std::chrono::hours(24 * 365));
     int64_t interval_factor = 10;
 };
 } // namespace hta

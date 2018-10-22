@@ -36,7 +36,11 @@ namespace hta::storage::file
 {
 Meta Metric::meta() const
 {
-    return Meta{ Duration(file_raw_.header().interval_min), file_raw_.header().interval_factor };
+    return Meta{
+        Duration(file_raw_.header().interval_min),
+        Duration(file_raw_.header().interval_max),
+        file_raw_.header().interval_factor,
+    };
 }
 
 void Metric::insert(TimeValue tv)
@@ -285,7 +289,7 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     index_begin = std::max<int64_t>(index_begin, 0);
     index_end = std::min<int64_t>(index_end, sz);
 
-    if (index_begin >= sz || index_end < 0)
+    if (index_begin >= static_cast<int64_t>(sz) || index_end < 0)
     {
         return {};
     }

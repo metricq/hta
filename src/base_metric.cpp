@@ -29,8 +29,8 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "storage/metric.hpp"
 
-#include <hta/metric.hpp>
 #include <hta/exception.hpp>
+#include <hta/metric.hpp>
 
 #include <cassert>
 
@@ -44,8 +44,13 @@ BaseMetric::BaseMetric()
 
 BaseMetric::BaseMetric(std::unique_ptr<storage::Metric> storage_metric)
 : storage_metric_(std::move(storage_metric)), interval_min_(storage_metric_->meta().interval_min),
+  interval_max_(storage_metric_->meta().interval_max),
   interval_factor_(storage_metric_->meta().interval_factor)
 {
+    if (interval_min_ > interval_max_)
+    {
+        throw_exception("interval_min > interval_max");
+    }
 }
 
 BaseMetric::~BaseMetric()

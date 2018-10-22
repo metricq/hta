@@ -169,6 +169,12 @@ void WriteMetric::insert(TimeValue tv)
 void WriteMetric::insert(Row row)
 {
     const auto interval = row.interval * interval_factor_;
+    if (interval > interval_max_)
+    {
+        // write this but don't do anything else!
+        storage_metric_->insert(row);
+        return;
+    }
     auto& level = get_level(interval);
     // We must do this after get_level, otherwise it confuses the level restore
     storage_metric_->insert(row);

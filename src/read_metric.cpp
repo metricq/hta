@@ -97,6 +97,7 @@ std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration i
         return retrieve_raw_row(begin, end, scope);
     }
     auto interval = interval_min_;
+    interval_upper_limit = std::min(interval_upper_limit, interval_max_);
     while (interval * interval_factor_ <= interval_upper_limit)
     {
         interval = interval * interval_factor_;

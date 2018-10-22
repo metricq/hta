@@ -271,6 +271,7 @@ private:
         check_stream("seekg header");
         stream_.read(reinterpret_cast<char*>(&header_), read_size);
         check_stream("read header");
+        header_.restore(read_size);
     }
 
     // Get the char* because we might not need it and don't want to construct a temporary string

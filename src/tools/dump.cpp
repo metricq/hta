@@ -63,6 +63,7 @@ void dump_header(const std::filesystem::path& path)
     std::cout << "duration_period: " << header.duration_period.num << " / "
               << header.duration_period.den << "\n";
     std::cout << "interval_min: " << header.interval_min << "\n";
+    std::cout << "interval_max: " << header.interval_max << "\n";
     std::cout << "interval_factor: " << header.interval_factor << "\n";
     if (header.interval == 0)
     {

@@ -55,22 +55,33 @@ public: // for the dump tool
         Header() = default; // default C'tor for reading
 
         Header(Duration interval, Meta meta)
-        : version{ 1 }, interval{ interval.count() }, duration_period{ Duration::period::num,
+        : version{ 2 }, interval{ interval.count() }, duration_period{ Duration::period::num,
                                                                        Duration::period::den },
-          interval_min{ meta.interval_min.count() }, interval_factor{ meta.interval_factor }
+          interval_min{ meta.interval_min.count() }, interval_factor{ meta.interval_factor },
+          interval_max{ meta.interval_max.count() }
         {
         }
 
-        void check(Duration interval)
+        /**
+         * Call this after reading it from a file
+         */
+        void restore(size_t read_bytes)
         {
-            if (version != 1)
-                throw_exception("Unsupported HTA file format version ", version, ", supported 1");
+            if (read_bytes != sizeof(Header))
+            {
+                throw_exception("Unexpected header size ", read_bytes, ", expected ",
+                                sizeof(Header));
+            }
+            // For now we don't support different versions
+            if (version != 2)
+            {
+                throw_exception("Unsupported HTA file format version ", version, ", supported 2");
+            }
             if (duration_period.num != Duration::period::num ||
                 duration_period.den != Duration::period::den)
+            {
                 throw_exception("Unsupported HTA chrono duration period.");
-            if (this->interval != interval.count())
-                throw_exception("Mismatching intervals in HTA file expected: ", interval.count(),
-                                ", actual: ", this->interval);
+            }
         }
 
         uint64_t version;
@@ -82,6 +93,7 @@ public: // for the dump tool
         } duration_period;
         int64_t interval_min;
         int64_t interval_factor;
+        int64_t interval_max;
 
         // Only add stuff - don't change it
     };

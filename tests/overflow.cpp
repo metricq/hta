@@ -45,6 +45,7 @@ using namespace std::literals::chrono_literals;
 
 constexpr auto swap_point = 1440000000000000000ns;
 constexpr auto delta = 20000ns;
+constexpr auto step = 1440000000000000ns;
 
 TEST_CASE("Ensure no overflow happens with specific timestamps.", "[hta]")
 {
@@ -66,6 +67,7 @@ TEST_CASE("Ensure no overflow happens with specific timestamps.", "[hta]")
                                 { "name", "foo" },
                                 { "mode", "RW" },
                                 { "interval_min", 14400000000000 },
+                                { "interval_max", 1440000000000000 },
                                 { "interval_factor", 10 },
                             },
                         },
@@ -85,6 +87,44 @@ TEST_CASE("Ensure no overflow happens with specific timestamps.", "[hta]")
         metric->insert(
             hta::TimeValue(hta::TimePoint(hta::duration_cast(swap_point - delta)), 42.0));
         metric->insert(
-            hta::TimeValue(hta::TimePoint(hta::duration_cast(swap_point + delta)), 42.0));
+            hta::TimeValue(hta::TimePoint(hta::duration_cast(swap_point + delta)), 43.0));
+        // We need this to trigger writing another interval high up
+        metric->insert(hta::TimeValue(
+            hta::TimePoint(hta::duration_cast(swap_point + step + delta)), 44.0));
+    }
+    REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "raw.hta") > 0);
+    REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "14400000000000.hta") > 0);
+    REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "144000000000000.hta") > 0);
+    REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "1440000000000000.hta") > 0);
+    REQUIRE(!std::filesystem::exists(test_pwd / "foo" / "14400000000000000.hta"));
+    {
+        hta::Directory dir(config);
+        auto metric = dir["foo"];
+
+        // TODO check raw values
+        hta::TimePoint t_min(hta::duration_cast(swap_point - delta));
+        hta::TimePoint t_max(hta::duration_cast(swap_point + delta));
+
+        {
+            // raw values
+            auto result = metric->retrieve(t_min, t_max, hta::duration_cast(1000000ns),
+                                           { hta::Scope::extended, hta::Scope::closed });
+            REQUIRE(result.size() == 2);
+        }
+        auto max_interval = hta::duration_cast(1440000000000000ns);
+        {
+            auto result = metric->retrieve(t_min, t_max, max_interval,
+                                           { hta::Scope::extended, hta::Scope::closed });
+            REQUIRE(result.size() == 2);
+            REQUIRE(result.at(0).interval == max_interval);
+            REQUIRE(result.at(1).interval == max_interval);
+        }
+        {
+            auto result = metric->retrieve(t_min, t_max, max_interval * 11,
+                                           { hta::Scope::extended, hta::Scope::closed });
+            REQUIRE(result.size() == 2);
+            REQUIRE(result.at(0).interval == max_interval);
+            REQUIRE(result.at(1).interval == max_interval);
+        }
     }
 }
