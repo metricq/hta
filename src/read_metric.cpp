@@ -89,15 +89,15 @@ std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, uint64_t m
     return retrieve(begin, end, interval_max_length, scope);
 }
 
-std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration interval_max,
+std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration interval_upper_limit,
                                       IntervalScope scope)
 {
-    if (interval_max < interval_min_)
+    if (interval_upper_limit < interval_min_)
     {
         return retrieve_raw_row(begin, end, scope);
     }
     auto interval = interval_min_;
-    while (interval * interval_factor_ <= interval_max)
+    while (interval * interval_factor_ <= interval_upper_limit)
     {
         interval = interval * interval_factor_;
     }
