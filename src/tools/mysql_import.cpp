@@ -231,7 +231,7 @@ int main(int argc, char* argv[])
             {
                 select_interval(*con, metric_config, in_metric_name);
             }
-            config["metrics"] = { { metric_config } };
+            config["metrics"] = json::array({metric_config});
             break;
         }
     }
