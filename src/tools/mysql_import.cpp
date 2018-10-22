@@ -205,7 +205,8 @@ int main(int argc, char* argv[])
     std::string in_metric_name = metric_name;
     std::string out_metric_name = metric_name;
     std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
-    std::replace(out_metric_name.begin(), out_metric_name.end(), '_', '.');
+    // DO NOT do this. There are metrics like foo/bar_baz, which should be foo.bar_baz
+    // std::replace(out_metric_name.begin(), out_metric_name.end(), '_', '.');
 
     std::cout << "Using import metric name: " << in_metric_name
               << ", hta metric name: " << out_metric_name << "\n";
