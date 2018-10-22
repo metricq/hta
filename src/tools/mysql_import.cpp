@@ -223,9 +223,17 @@ int main(int argc, char* argv[])
     std::unique_ptr<sql::Connection> con(driver->connect(host, user, password));
     con->setSchema(schema);
 
-    if (auto_interval)
+    for (auto metric_config : config["metrics"])
     {
-        select_interval(*con, config[out_metric_name], in_metric_name);
+        if (metric_config["name"] == out_metric_name)
+        {
+            if (auto_interval)
+            {
+                select_interval(*con, metric_config, in_metric_name);
+            }
+            config["metrics"] = { { metric_config } };
+            break;
+        }
     }
 
     hta::Directory out_directory(config);
