@@ -99,7 +99,7 @@ std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration i
     auto interval = interval_min_;
     while (interval * interval_factor_ <= interval_max)
     {
-        interval *= interval_factor_;
+        interval = interval * interval_factor_;
     }
     do
     {
@@ -115,7 +115,7 @@ std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration i
             return rows;
         }
         // If the requested level has no data yet, we must ask the lower levels
-        interval /= interval_factor_;
+        interval = interval / interval_factor_;
     } while (interval >= interval_min_);
     // No data at all
     return {};

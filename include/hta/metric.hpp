@@ -29,6 +29,7 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include <hta/exception.hpp>
 #include <hta/types.hpp>
 
 #include <chrono>
@@ -52,14 +53,63 @@ protected:
     BaseMetric(std::unique_ptr<storage::Metric> storage_metric);
     ~BaseMetric();
 
+    // These classes should not be visible outside
+    class IntervalFactor
+    {
+    public:
+        IntervalFactor()
+        {
+            // needed for linking only
+            throw_exception("uninitialized IntervalFactor");
+        }
+
+        IntervalFactor(int64_t factor) : factor_(factor)
+        {
+        }
+
+        Duration operator*(Duration duration) const
+        {
+            Duration::rep result;
+            if (__builtin_mul_overflow(factor_, duration.count(), &result))
+            {
+                throw_exception("integer overflow during interval multiplication");
+            }
+            return Duration(result);
+        }
+
+        Duration divide_by(Duration duration) const
+        {
+            auto result = duration / factor_;
+            if (result.count() == 0)
+            {
+                throw_exception("interval division yields 0");
+            }
+            return Duration(result);
+        }
+
+        friend Duration operator*(Duration duration, IntervalFactor factor)
+        {
+            return factor * duration;
+        }
+
+        friend Duration operator/(Duration duration, IntervalFactor factor)
+        {
+            return factor.divide_by(duration);
+        }
+
+    private:
+        int64_t factor_;
+    };
+
 protected:
     std::unique_ptr<storage::Metric> storage_metric_;
 
     Duration interval_min_;
-    uint64_t interval_factor_;
+    IntervalFactor interval_factor_;
 
     TimePoint previous_time_;
 };
+
 
 class ReadMetric : protected virtual BaseMetric
 {

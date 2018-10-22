@@ -30,6 +30,7 @@
 #include "storage/metric.hpp"
 
 #include <hta/metric.hpp>
+#include <hta/exception.hpp>
 
 #include <cassert>
 
@@ -38,7 +39,7 @@ namespace hta
 BaseMetric::BaseMetric()
 {
     // This should never be called, but is necessary for linking
-    assert(false);
+    throw_exception("link-only BaseMetric constructor called");
 }
 
 BaseMetric::BaseMetric(std::unique_ptr<storage::Metric> storage_metric)
