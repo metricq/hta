@@ -22,6 +22,10 @@ add_executable(hta.test_middle_interval middle_interval.cpp)
 add_test(hta.test_middle_interval hta.test_middle_interval)
 target_link_libraries(hta.test_middle_interval PRIVATE hta::hta catch::catch json::json)
 
+add_executable(hta.test_overflow overflow.cpp)
+add_test(hta.test_overflow hta.test_overflow)
+target_link_libraries(hta.test_overflow PRIVATE hta::hta catch::catch json::json)
+
 find_package(benchmark QUIET)
 if (benchmark_FOUND)
     message(STATUS "Looking for google benchmark - found, will build benchmark tests.")
