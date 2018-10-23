@@ -75,7 +75,7 @@ json read_json_from_file(const std::filesystem::path& path)
 
 template <typename L>
 size_t stream_query(sql::Connection& db, const std::string& query, L cb,
-                    size_t chunk_size = 50000000)
+                    size_t chunk_size = 20000000)
 {
     std::unique_ptr<sql::PreparedStatement> stmt(db.prepareStatement(query + " LIMIT ?, ?"));
     for (size_t offset = 0;; offset += chunk_size)
