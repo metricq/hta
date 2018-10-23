@@ -123,7 +123,7 @@ void WriteMetric::insert(TimeValue tv)
     {
         throw std::out_of_range("cannot insert invalid (0) hta::TimePoint");
     }
-    if (tv.time < previous_time_)
+    if (tv.time <= previous_time_)
     {
         throw std::out_of_range("trying to add non-monotonic timestamp; previous " +
                                 std::to_string(previous_time_.time_since_epoch().count()) +
