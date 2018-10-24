@@ -56,6 +56,11 @@ target_link_libraries(hta
 
 target_compile_features(hta PUBLIC cxx_std_17)
 
+target_compile_options(hta
+    PRIVATE
+        -Wall -Wextra -pedantic -Wsign-compare
+)
+
 add_library(hta::hta ALIAS hta)
 
 find_package(Boost COMPONENTS program_options system timer)
@@ -88,8 +93,8 @@ endif()
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta
-        INTERFACE
-            -Wall -Wextra -pedantic -Wsign-compare
+        PUBLIC
+            -Wall -Wextra -pedantic -Wsign-compare -Werror
     )
 
     install(DIRECTORY
