@@ -165,10 +165,11 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
         return { 0, 0 };
     }
 
-    int64_t index_begin;
+    // We initialize so we don't get uninitialized warnings
+    int64_t index_begin = -1;
     /* this is the index of the end _element_ (not after!) according to scope.end
      * It may be out of scope (==size()) in some cases */
-    int64_t index_end;
+    int64_t index_end = -1;
     // This is quite complex and possibly bad for performance
     // TODO optimize // simplify
     switch (scope.begin)
@@ -219,6 +220,7 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
 
     assert(index_begin >= 0);
     assert(index_begin < sz);
+    assert(index_end >= 0);
     assert(index_end <= sz);
     assert(index_begin <= index_end);
 
@@ -285,8 +287,9 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     auto offset_begin = begin - epoch_;
     auto offset_end = end - epoch_;
 
-    int64_t index_begin;
-    int64_t index_end; // this point is **included** in the result!
+    // We initialize so we don't get uninitialized warnings
+    int64_t index_begin = -1;
+    int64_t index_end = -1; // this point is **included** in the result!
     switch (scope.begin)
     {
     case Scope::closed:
