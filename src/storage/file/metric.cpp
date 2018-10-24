@@ -165,7 +165,7 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
         return { 0, 0 };
     }
 
-    // We initialize so we don't get uninitialized warnings
+    // We initialize so we don't get uninitialized
     int64_t index_begin = -1;
     /* this is the index of the end _element_ (not after!) according to scope.end
      * It may be out of scope (==size()) in some cases */
