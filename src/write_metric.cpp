@@ -32,6 +32,7 @@
 #include "storage/metric.hpp"
 
 #include <hta/metric.hpp>
+#include <hta/ostream.hpp>
 #include <hta/types.hpp>
 
 #include <stdexcept>
@@ -182,9 +183,10 @@ void WriteMetric::insert(Row row)
     {
         level.time_current = row.time;
     }
-    else
+    else if (level.time_current != row.time)
     {
-        assert(level.time_current == row.time);
+        throw_exception("inconsistent level time for interval ", interval,
+                        " time_current: ", level.time_current, " row.time: ", row.time);
     }
     auto level_time_end = interval_end(level.time_current, interval);
     if (row.end_time() >= level_time_end)
