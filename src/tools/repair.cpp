@@ -54,14 +54,13 @@ json read_json_from_file(const std::filesystem::path& path)
 
 void raw_copy(hta::ReadMetric& src, hta::WriteMetric& dst, hta::Duration chunk_interval)
 {
-    auto range = src.range();
+    auto total_range = src.range();
     size_t processed = 0;
     auto count = src.count();
     hta::TimePoint previous_time;
-    for (auto t0 = range.first; t0 <= range.second; t0 += chunk_interval)
+    for (auto t0 = total_range.first; t0 <= total_range.second; t0 += chunk_interval)
     {
-        auto data =
-            src.retrieve(t0, t0 + chunk_interval, { hta::Scope ::closed, hta::Scope ::open });
+        auto data = src.retrieve(t0, t0 + chunk_interval, { hta::Scope::closed, hta::Scope::open });
         for (auto tv : data)
         {
             processed++;
