@@ -32,6 +32,8 @@
 #include <hta/filesystem.hpp>
 #include <hta/types.hpp>
 
+#include <algorithm>
+
 namespace hta::storage::file
 {
 Meta Metric::meta() const
@@ -64,50 +66,78 @@ void Metric::flush()
     }
 }
 
-uint64_t Metric::find_index_before_or_on(TimePoint t, uint64_t left, uint64_t right)
+int64_t Metric::find_index_before_or_on_binary(TimePoint t, int64_t left, int64_t right, int64_t sz)
 {
     // left < right means right != 0
     // assumes monotonicity ts(left) < ts(right)
     // invariant ts(left) <= t < ts(right)
     // right can be size() // out of range, but the pivot can never be
     assert(left < right);
+    // TODO expensive, use extra debug macro
+    assert(get_raw_ts(left) <= t);
+    assert(right == sz || t < get_raw_ts(right));
     if (right - left == 1)
     {
         return left;
     }
-    uint64_t pivot = (left + right) / 2;
+    auto pivot = (left + right) / 2;
+    assert(pivot < sz);
     TimePoint t_pivot = get_raw_ts(pivot);
     if (t >= t_pivot)
     {
-        return find_index_before_or_on(t, pivot, right);
+        return find_index_before_or_on_binary(t, pivot, right, sz);
     }
     else
     {
-        return find_index_before_or_on(t, left, pivot);
+        return find_index_before_or_on_binary(t, left, pivot, sz);
     }
 }
 
-uint64_t Metric::find_index_on_or_after(TimePoint t, uint64_t left, uint64_t right)
+int64_t Metric::find_index_before_or_on(TimePoint t, int64_t sz)
+{
+    if (get_raw_ts(0) > t)
+    {
+        return -1;
+    }
+    return find_index_before_or_on_binary(t, 0, sz, sz);
+}
+
+int64_t Metric::find_index_on_or_after_binary(TimePoint t, int64_t left, int64_t right, int64_t sz)
 {
     // left < right means right != 0
     // assumes monotonicity ts(left) < ts(right)
     // invariant ts(left) < t <= ts(right)
     // right can be size() // out of range, but the pivot can never be
     assert(left < right);
+    // TODO expensive, use extra debug macro
+    assert(get_raw_ts(left) < t);
+    assert(right == sz || t <= get_raw_ts(right));
+
     if (right - left == 1)
     {
         return right;
     }
-    uint64_t pivot = (left + right) / 2;
+    auto pivot = (left + right) / 2;
+    assert(pivot < sz);
+
     TimePoint t_pivot = get_raw_ts(pivot);
     if (t > t_pivot)
     {
-        return find_index_on_or_after(t, pivot, right);
+        return find_index_on_or_after_binary(t, pivot, right, sz);
     }
     else
     {
-        return find_index_on_or_after(t, left, pivot);
+        return find_index_on_or_after_binary(t, left, pivot, sz);
     }
+}
+
+int64_t Metric::find_index_on_or_after(TimePoint t, int64_t sz)
+{
+    if (get_raw_ts(0) >= t)
+    {
+        return 0;
+    }
+    return find_index_on_or_after_binary(t, 0, sz, sz);
 }
 
 TimePoint Metric::get_raw_ts(uint64_t index)
@@ -128,32 +158,34 @@ uint64_t Metric::size(Duration interval)
 std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
                                                  IntervalScope scope)
 {
-    const auto sz = size();
+    // Must be signed for comparision
+    const auto sz = static_cast<int64_t>(size());
     if (sz == 0)
     {
         return { 0, 0 };
     }
 
-    uint64_t index_begin;
+    int64_t index_begin;
     /* this is the index of the end _element_ (not after!) according to scope.end
      * It may be out of scope (==size()) in some cases */
-    uint64_t index_end;
+    int64_t index_end;
     // This is quite complex and possibly bad for performance
     // TODO optimize // simplify
     switch (scope.begin)
     {
     case Scope::closed:
-        index_begin = find_index_on_or_after(begin, 0, sz);
+        index_begin = find_index_on_or_after(begin, sz);
         break;
     case Scope::open:
-        index_begin = find_index_before_or_on(begin, 0, sz);
+        index_begin = find_index_before_or_on(begin, sz);
         if (index_begin < sz)
         {
             index_begin++;
         }
         break;
     case Scope::extended:
-        index_begin = find_index_before_or_on(begin, 0, sz);
+        index_begin = find_index_before_or_on(begin, sz);
+        index_begin = std::max<decltype(index_begin)>(index_begin, 0);
         break;
     case Scope::infinity:
         index_begin = 0;
@@ -163,17 +195,17 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
     switch (scope.end)
     {
     case Scope::closed:
-        index_end = find_index_before_or_on(end, 0, sz);
+        index_end = find_index_before_or_on(end, sz);
         break;
     case Scope::open:
-        index_end = find_index_on_or_after(end, 0, sz);
+        index_end = find_index_on_or_after(end, sz);
         if (index_end > 0)
         {
             index_end--;
         }
         break;
     case Scope::extended:
-        index_end = find_index_on_or_after(end, 0, sz);
+        index_end = find_index_on_or_after(end, sz);
         break;
     case Scope::infinity:
         index_end = sz - 1;
@@ -185,6 +217,7 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
         index_end++;
     }
 
+    assert(index_begin >= 0);
     assert(index_begin < sz);
     assert(index_end <= sz);
     assert(index_begin <= index_end);

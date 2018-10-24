@@ -89,9 +89,35 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
         auto metric = dir["foo"];
         CHECK(metric->range().first == tp(0));
         CHECK(metric->range().second == tp(count - 1));
+        // Checking out of file timestamps
         {
+            // closed-closed on corner timestamps
             auto result =
-                metric->retrieve(tp(0), tp(count - 1), { hta::Scope ::closed, hta::Scope::closed });
+                metric->retrieve(tp(0), tp(count - 1), { hta::Scope::closed, hta::Scope::closed });
+            CHECK(result.size() == count);
+            CHECK(result.at(0).time == tp(0));
+            CHECK(result.at(count - 1).time == tp(count - 1));
+        }
+        {
+            // open-open on corner timestamps
+            auto result =
+                metric->retrieve(tp(0), tp(count - 1), { hta::Scope::open, hta::Scope::open });
+            CHECK(result.size() == count - 2);
+            CHECK(result.at(0).time == tp(1));
+            CHECK(result.at(count - 3).time == tp(count - 2));
+        }
+        {
+            // closed-closed out range
+            auto result = metric->retrieve(tp(0, -1), tp(count - 1, 1),
+                                           { hta::Scope::closed, hta::Scope::closed });
+            CHECK(result.size() == count);
+            CHECK(result.at(0).time == tp(0));
+            CHECK(result.at(count - 1).time == tp(count - 1));
+        }
+        {
+            // open-open out range
+            auto result = metric->retrieve(tp(0, -1), tp(count - 1, 1),
+                                           { hta::Scope::open, hta::Scope::open });
             CHECK(result.size() == count);
             CHECK(result.at(0).time == tp(0));
             CHECK(result.at(count - 1).time == tp(count - 1));

@@ -139,8 +139,10 @@ private:
 
     std::pair<uint64_t, uint64_t> find_index(TimePoint begin, TimePoint end, IntervalScope scope);
 
-    uint64_t find_index_before_or_on(TimePoint t, uint64_t left, uint64_t right);
-    uint64_t find_index_on_or_after(TimePoint t, uint64_t left, uint64_t right);
+    int64_t find_index_before_or_on_binary(TimePoint t, int64_t left, int64_t right, int64_t sz);
+    int64_t find_index_before_or_on(TimePoint t, int64_t sz);
+    int64_t find_index_on_or_after_binary(TimePoint t, int64_t left, int64_t right, int64_t sz);
+    int64_t find_index_on_or_after(TimePoint t, int64_t sz);
 
     TimePoint get_raw_ts(uint64_t index);
 
