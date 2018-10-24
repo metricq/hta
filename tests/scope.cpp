@@ -71,11 +71,12 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     config_file << config;
     config_file.close();
 
+    constexpr auto count = 1000000;
     {
         hta::Directory dir(config_path);
         auto metric = dir["foo"];
 
-        for (int i = 0; i < 1000000; i++)
+        for (int i = 0; i < count; i++)
         {
             metric->insert({ tp(i), double(i) });
         }
@@ -86,6 +87,22 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     {
         hta::Directory dir(config_path);
         auto metric = dir["foo"];
+        CHECK(metric->range().first == tp(0));
+        CHECK(metric->range().second == tp(count - 1));
+        {
+            auto result =
+                metric->retrieve(tp(0), tp(count - 1), { hta::Scope ::closed, hta::Scope::closed });
+            CHECK(result.size() == count);
+            CHECK(result.at(0).time == tp(0));
+            CHECK(result.at(count - 1).time == tp(count - 1));
+        }
+        {
+            auto result =
+                metric->retrieve(tp(0), tp(count - 1), { hta::Scope ::closed, hta::Scope::open });
+            CHECK(result.size() == count - 1);
+            CHECK(result.at(0).time == tp(0));
+            CHECK(result.at(count - 2).time == tp(count - 2));
+        }
 
         // RAW tests
         {
