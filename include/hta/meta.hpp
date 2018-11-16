@@ -46,7 +46,7 @@ struct Meta
     : interval_min(interval_min), interval_max(interval_max), interval_factor(interval_factor)
     {
     }
-    Meta(const json& config);
+    explicit Meta(const json& config);
 
     Duration interval_min = duration_cast(std::chrono::seconds(10));
     Duration interval_max = duration_cast(std::chrono::hours(24 * 365));

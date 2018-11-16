@@ -55,14 +55,14 @@ std::unique_ptr<storage::Metric> Directory::open(const std::string& name, OpenMo
     case OpenMode::read_write:
         return std::make_unique<Metric>(FileOpenTag::ReadWrite(), path, meta);
     default:
-        throw std::logic_error("Unknown OpenMode");
+        throw std::logic_error("unknown OpenMode");
     }
 }
 
 std::vector<std::string> Directory::metric_names()
 {
     std::vector<std::string> result;
-    for (std::filesystem::path path : std::filesystem::directory_iterator(directory_))
+    for (const std::filesystem::path &path : std::filesystem::directory_iterator(directory_))
     {
         if (std::filesystem::is_directory(path))
         {

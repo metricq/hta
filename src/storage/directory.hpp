@@ -49,7 +49,7 @@ class Directory
 public:
     virtual std::unique_ptr<storage::Metric>
     open(const std::string& name, OpenMode mode = OpenMode::read_write, Meta meta = Meta()) = 0;
-    virtual ~Directory(){};
+    virtual ~Directory() = default;
 
     virtual std::vector<std::string> metric_names() = 0;
 };

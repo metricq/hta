@@ -42,13 +42,16 @@ struct Clock
     using duration = Duration;
     using rep = duration::rep;
     using period = duration::period;
-    // using time_point = std::chrono::time_point<Clock>;
 
-    // Default constructor creates an "Invalid" timestamp that evaluates to false
+    // using time_point = std::chrono::time_point<Clock>;
+    // we no longer want a vanilla time_point because operator bool
+    // the default constructor creates an "Invalid" timestamp that evaluates to false
     struct time_point : std::chrono::time_point<Clock>
     {
         using base = std::chrono::time_point<Clock>;
         using base::base;
+
+        // implicit conversion is ok here
         constexpr time_point(const base& x) : base(x)
         {
         }

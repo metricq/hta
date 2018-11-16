@@ -53,8 +53,8 @@ namespace storage
 class Directory
 {
 public:
-    Directory(const std::filesystem::path& config_path);
-    Directory(const json& config);
+    explicit Directory(const std::filesystem::path& config_path);
+    explicit Directory(const json& config);
     ~Directory();
 
     ReadMetric* read_metric(const std::string& name);

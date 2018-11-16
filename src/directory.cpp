@@ -56,7 +56,7 @@ json read_json_from_file(const std::filesystem::path& path)
 
 Directory::Directory(const json& config)
 {
-    auto type = config["type"].get<std::string>();
+    auto type = config.at("type").get<std::string>();
     if (type == "file")
     {
         directory_ = std::make_unique<storage::file::Directory>(config["path"].get<std::string>());
@@ -68,37 +68,41 @@ Directory::Directory(const json& config)
 
     if (config.count("metrics"))
     {
-        for (const auto& metric : config["metrics"])
+        for (const auto& metric : config.at("metrics"))
         {
-            const auto& mode = metric["mode"];
-            const auto& name = metric["name"];
+            const auto mode = metric.at("mode").get<std::string>();
+            const auto name = metric.at("name").get<std::string>();
+            bool added;
+
             if (mode == "RW")
             {
-                auto [_, added] = read_write_metrics_.emplace(
-                    metric["name"], std::make_unique<ReadWriteMetric>(directory_->open(
-                                        name, storage::OpenMode::read_write, Meta(metric))));
-                assert(added);
-                (void)added;
+                added = read_write_metrics_
+                            .emplace(name, std::make_unique<ReadWriteMetric>(directory_->open(
+                                               name, storage::OpenMode::read_write, Meta(metric))))
+                            .second;
             }
             else if (mode == "R")
             {
-                auto [_, added] = read_metrics_.emplace(
-                    metric["name"], std::make_unique<ReadMetric>(directory_->open(
-                                        name, storage::OpenMode::read, Meta(metric))));
-                assert(added);
-                (void)added;
+                added = read_metrics_
+                            .emplace(name, std::make_unique<ReadMetric>(directory_->open(
+                                               name, storage::OpenMode::read, Meta(metric))))
+                            .second;
             }
             else if (mode == "W")
             {
-                auto [_, added] = write_metrics_.emplace(
-                    metric["name"], std::make_unique<WriteMetric>(directory_->open(
-                                        name, storage::OpenMode::write, Meta(metric))));
-                assert(added);
-                (void)added;
+                added = write_metrics_
+                            .emplace(name, std::make_unique<WriteMetric>(directory_->open(
+                                               name, storage::OpenMode::write, Meta(metric))))
+                            .second;
             }
             else
             {
-                assert(!"Unknown metric mode");
+                throw std::runtime_error(std::string("unknown metric mode: ") + mode);
+            }
+            if (!added)
+            {
+                throw std::runtime_error(std::string("metric ") + name +
+                                         " already exists as metric of mode " + mode);
             }
         }
     }
@@ -123,7 +127,11 @@ ReadWriteMetric* Directory::operator[](const std::string& name)
         std::tie(it, added) = read_write_metrics_.try_emplace(
             name, std::make_unique<ReadWriteMetric>(
                       directory_->open(name, storage::OpenMode::read_write)));
-        assert(added);
+        if (!added)
+        {
+            throw std::runtime_error(std::string("ReadWriteMetric ") + name +
+                                     " already exists in Directory");
+        }
     }
     return it->second.get();
 }
@@ -136,7 +144,11 @@ ReadMetric* Directory::read_metric(const std::string& name)
         bool added;
         std::tie(it, added) = read_metrics_.try_emplace(
             name, std::make_unique<ReadMetric>(directory_->open(name, storage::OpenMode::read)));
-        assert(added);
+        if (!added)
+        {
+            throw std::runtime_error(std::string("ReadMetric ") + name +
+                                     " already exists in Directory");
+        }
     }
     return it->second.get();
 }
@@ -149,12 +161,14 @@ WriteMetric* Directory::write_metric(const std::string& name)
         bool added;
         std::tie(it, added) = write_metrics_.try_emplace(
             name, std::make_unique<WriteMetric>(directory_->open(name, storage::OpenMode::write)));
-        assert(added);
+        if (!added)
+        {
+            throw std::runtime_error(std::string("WriteMetric ") + name +
+                                     " already exists in Directory");
+        }
     }
     return it->second.get();
 }
 
-Directory::~Directory()
-{
-}
+Directory::~Directory() = default;
 } // namespace hta

@@ -40,7 +40,7 @@ class Level
 public:
     Level() = default;
 
-    Level(TimePoint time) : time_current(time)
+    explicit Level(TimePoint time) : time_current(time)
     {
     }
 
@@ -48,7 +48,7 @@ public:
     {
         assert(tv.time >= time_current);
         auto duration = tv.time - time_current;
-        aggregate += { tv.value, duration };
+        aggregate += Aggregate{ tv.value, duration };
         time_current = tv.time;
     }
 

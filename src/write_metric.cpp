@@ -48,9 +48,7 @@ WriteMetric::WriteMetric()
     assert(storage_metric_);
 }
 
-WriteMetric::~WriteMetric()
-{
-}
+WriteMetric::~WriteMetric() = default;
 
 WriteMetric::WriteMetric(std::unique_ptr<storage::Metric> storage_metric)
 : BaseMetric(std::move(storage_metric))
@@ -80,7 +78,7 @@ Level WriteMetric::restore_level(Duration interval)
     {
         auto data =
             storage_metric_->get(time_closed, {}, IntervalScope{ scope_begin, Scope::infinity });
-        if (data.size() > 0)
+        if (!data.empty())
         {
             if (!level.time_current)
             {

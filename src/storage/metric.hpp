@@ -63,6 +63,6 @@ public:
 
     virtual std::pair<TimePoint, TimePoint> range() = 0;
 
-    virtual ~Metric(){};
+    virtual ~Metric() = default;
 };
 } // namespace hta::storage

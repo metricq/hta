@@ -53,7 +53,5 @@ BaseMetric::BaseMetric(std::unique_ptr<storage::Metric> storage_metric)
     }
 }
 
-BaseMetric::~BaseMetric()
-{
-}
+BaseMetric::~BaseMetric() = default;
 } // namespace hta

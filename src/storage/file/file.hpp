@@ -134,7 +134,7 @@ public:
     {
         // We need to use append mode otherwise it won't use O_CREAT.
         // Meanwhile app doesn't event seek to the end... oh my.
-        stream_.seekp(0, stream_.end);
+        stream_.seekp(0, std::fstream::end);
         check_stream("seekp to end");
         if (stream_.tellp() == 0)
         {
@@ -182,7 +182,7 @@ public:
 
     size_type size()
     {
-        stream_.seekg(0, stream_.end);
+        stream_.seekg(0, std::fstream::end);
         check_stream("seekg to end for size");
         auto size_bytes = ssize_t(stream_.tellg()) - ssize_t(data_begin_);
         assert(size_bytes >= 0);

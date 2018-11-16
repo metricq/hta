@@ -50,7 +50,7 @@ class BaseMetric
 {
 protected:
     BaseMetric();
-    BaseMetric(std::unique_ptr<storage::Metric> storage_metric);
+    explicit BaseMetric(std::unique_ptr<storage::Metric> storage_metric);
     ~BaseMetric();
 
     // These classes should not be visible outside
@@ -63,7 +63,7 @@ protected:
             throw_exception("uninitialized IntervalFactor");
         }
 
-        IntervalFactor(int64_t factor) : factor_(factor)
+        explicit IntervalFactor(int64_t factor) : factor_(factor)
         {
         }
 
@@ -115,7 +115,7 @@ protected:
 class ReadMetric : protected virtual BaseMetric
 {
 public:
-    ReadMetric(std::unique_ptr<storage::Metric> storage_metric);
+    explicit ReadMetric(std::unique_ptr<storage::Metric> storage_metric);
 
 protected:
     ReadMetric();
@@ -141,7 +141,7 @@ private:
 class WriteMetric : protected virtual BaseMetric
 {
 public:
-    WriteMetric(std::unique_ptr<storage::Metric> storage_metric);
+    explicit WriteMetric(std::unique_ptr<storage::Metric> storage_metric);
     ~WriteMetric();
 
 protected:
@@ -162,6 +162,6 @@ private:
 class ReadWriteMetric : public ReadMetric, public WriteMetric
 {
 public:
-    ReadWriteMetric(std::unique_ptr<storage::Metric> storage_metric);
+    explicit ReadWriteMetric(std::unique_ptr<storage::Metric> storage_metric);
 };
 } // namespace hta

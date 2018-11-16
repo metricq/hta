@@ -60,7 +60,7 @@ std::vector<Row> ReadMetric::retrieve_raw_row(TimePoint begin, TimePoint end, In
     result.reserve(result_tv.size());
     for (auto tv : result_tv)
     {
-        result.push_back({ Duration(0), tv.time, Aggregate(tv.value) });
+        result.emplace_back(Duration(0), tv.time, Aggregate(tv.value));
     }
     return result;
 }
@@ -105,7 +105,7 @@ std::vector<Row> ReadMetric::retrieve(TimePoint begin, TimePoint end, Duration i
     do
     {
         auto result = storage_metric_->get(begin, end, interval, scope);
-        if (result.size() > 0)
+        if (!result.empty())
         {
             std::vector<Row> rows;
             rows.reserve(result.size());

@@ -54,7 +54,7 @@ constexpr inline bool operator==(TimeValue left, TimeValue right)
 struct Aggregate
 {
     Aggregate() = default;
-    Aggregate(Value value, Duration active_time = Duration(0));
+    explicit Aggregate(Value value, Duration active_time = Duration(0));
 
     Aggregate(Value minimum, Value maximum, Value sum, uint64_t count, Value integral,
               const Duration& active_time);
