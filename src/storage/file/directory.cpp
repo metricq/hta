@@ -30,6 +30,7 @@
 #include "directory.hpp"
 #include "metric.hpp"
 
+#include <hta/exception.hpp>
 #include <hta/filesystem.hpp>
 
 #include <stdexcept>
@@ -45,7 +46,18 @@ std::unique_ptr<storage::Metric> Directory::open(const std::string& name, OpenMo
 {
     auto path = directory_ / std::filesystem::path(name);
     // Don't do that in the metric itself (member initialization before constructor body)
-    std::filesystem::create_directories(path);
+    try
+    {
+        // We do not recursively create the directory
+        // to avoid creating fresh databases in unmounted filesystems
+        std::filesystem::create_directory(path);
+    }
+    catch (const std::filesystem::filesystem_error& e)
+    {
+        throw_exception(
+            "Failed to create metric directory. Make sure the parent directory exists. ", path,
+            ": ", e.what());
+    }
     switch (mode)
     {
     case OpenMode::read:
