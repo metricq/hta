@@ -67,13 +67,13 @@ find_package(Boost COMPONENTS program_options system timer)
 
 if(Boost_FOUND)
     add_executable(hta_check src/tools/check.cpp)
-    target_link_libraries(hta_check PRIVATE hta::hta)
+    target_link_libraries(hta_check PRIVATE hta::hta Boost::program_options Boost::system)
 
     add_executable(hta_dummy src/tools/dummy.cpp)
     target_link_libraries(hta_dummy PRIVATE hta::hta)
 
     add_executable(hta_dump src/tools/dump.cpp)
-    target_link_libraries(hta_dump PRIVATE hta::hta)
+    target_link_libraries(hta_dump PRIVATE hta::hta Boost::program_options Boost::system)
 
     add_executable(hta_repair src/tools/repair.cpp)
     target_link_libraries(hta_repair PRIVATE hta::hta)
