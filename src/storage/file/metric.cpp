@@ -145,12 +145,12 @@ TimePoint Metric::get_raw_ts(uint64_t index)
     return file_raw().read(index).time;
 }
 
-uint64_t Metric::size()
+std::size_t Metric::size()
 {
     return file_raw().size();
 }
 
-uint64_t Metric::size(Duration interval)
+std::size_t Metric::size(Duration interval)
 {
     return file_hta(interval).size();
 }
