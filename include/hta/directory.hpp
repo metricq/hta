@@ -60,6 +60,7 @@ public:
     ReadMetric* read_metric(const std::string& name);
     WriteMetric* write_metric(const std::string& name);
     ReadWriteMetric* operator[](const std::string& name);
+    ReadWriteMetric* at(const std::string& name) const;
 
     std::vector<std::string> metric_names();
 

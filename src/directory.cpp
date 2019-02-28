@@ -136,6 +136,11 @@ ReadWriteMetric* Directory::operator[](const std::string& name)
     return it->second.get();
 }
 
+ReadWriteMetric* Directory::at(const std::string& name) const
+{
+    return read_write_metrics_.at(name).get();
+}
+
 ReadMetric* Directory::read_metric(const std::string& name)
 {
     auto it = read_metrics_.find(name);
