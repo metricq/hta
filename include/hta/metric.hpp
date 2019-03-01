@@ -51,7 +51,7 @@ class BaseMetric
 protected:
     BaseMetric();
     explicit BaseMetric(std::unique_ptr<storage::Metric> storage_metric);
-    ~BaseMetric();
+    virtual ~BaseMetric();
 
     // These classes should not be visible outside
     class IntervalFactor

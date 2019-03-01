@@ -26,6 +26,10 @@ add_executable(hta.test_overflow overflow.cpp)
 add_test(hta.test_overflow hta.test_overflow)
 target_link_libraries(hta.test_overflow PRIVATE hta::hta catch::catch json::json)
 
+add_executable(hta.test_read_write_conversion read_write_conversion.cpp)
+add_test(hta.test_read_write_conversion hta.test_read_write_conversion)
+target_link_libraries(hta.test_read_write_conversion PRIVATE hta::hta catch::catch json::json)
+
 find_package(benchmark QUIET)
 if (benchmark_FOUND)
     message(STATUS "Looking for google benchmark - found, will build benchmark tests.")

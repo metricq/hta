@@ -30,20 +30,18 @@
 #pragma once
 
 #include <hta/filesystem.hpp>
+#include <hta/metric.hpp>
 
 #include <nlohmann/json_fwd.hpp>
 
 #include <string>
 #include <unordered_map>
+#include <variant>
 #include <vector>
 
 namespace hta
 {
 using json = nlohmann::json;
-
-class ReadMetric;
-class WriteMetric;
-class ReadWriteMetric;
 
 namespace storage
 {
@@ -66,8 +64,7 @@ public:
 
 private:
     std::unique_ptr<storage::Directory> directory_;
-    std::unordered_map<std::string, std::unique_ptr<ReadMetric>> read_metrics_;
-    std::unordered_map<std::string, std::unique_ptr<WriteMetric>> write_metrics_;
-    std::unordered_map<std::string, std::unique_ptr<ReadWriteMetric>> read_write_metrics_;
+    std::unordered_map<std::string, std::variant<ReadMetric, WriteMetric, ReadWriteMetric>>
+        metrics_;
 };
 } // namespace hta
