@@ -68,9 +68,16 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     auto created = std::filesystem::create_directories(test_pwd);
     REQUIRE(created);
 
-    json config;
-    config["type"] = "file";
-    config["path"] = test_pwd;
+    json config = { { "type", "file" },
+                    { "path", test_pwd },
+                    {
+                        "metrics",
+                        {
+                            {
+                                { "name", "foo" },
+                            },
+                        },
+                    } };
 
     auto config_path = test_pwd / "config.json";
     std::ofstream config_file;

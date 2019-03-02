@@ -80,20 +80,23 @@ Directory::Directory(const json& config)
                                  std::forward_as_tuple(name, metric_config, *directory_));
             }
         }
-        assert(metrics.is_object());
-        for (const auto& elem : metrics.items())
+        else
         {
-            const auto name = elem.key();
-            const auto& metric_config = elem.value();
+            assert(metrics.is_object());
+            for (const auto& elem : metrics.items())
+            {
+                const auto name = elem.key();
+                const auto& metric_config = elem.value();
 
-            if (metric_config.count("prefix") && metric_config.at("prefix").get<bool>())
-            {
-                prefixes_.emplace_back(name, metric_config);
-            }
-            else
-            {
-                metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                 std::forward_as_tuple(name, metric_config, *directory_));
+                if (metric_config.count("prefix") && metric_config.at("prefix").get<bool>())
+                {
+                    prefixes_.emplace_back(name, metric_config);
+                }
+                else
+                {
+                    metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                                     std::forward_as_tuple(name, metric_config, *directory_));
+                }
             }
         }
     }

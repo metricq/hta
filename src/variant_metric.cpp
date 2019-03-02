@@ -41,7 +41,11 @@ using json = nlohmann::json;
 VariantMetric::Variant make_variant(const std::string& name, const json& config,
                                     storage::Directory& storage)
 {
-    const auto mode = config.at("mode").get<std::string>();
+    std::string mode = "RW"; // default
+    if (config.count("mode"))
+    {
+        mode = config.at("mode").get<std::string>();
+    }
     if (mode == "RW")
     {
         return VariantMetric::Variant(
@@ -55,8 +59,8 @@ VariantMetric::Variant make_variant(const std::string& name, const json& config,
     }
     if (mode == "W")
     {
-        return VariantMetric::Variant(std::in_place_type<ReadMetric>,
-                                      storage.open(name, storage::OpenMode::read, Meta(config)));
+        return VariantMetric::Variant(std::in_place_type<WriteMetric>,
+                                      storage.open(name, storage::OpenMode::write, Meta(config)));
     }
     throw std::runtime_error(std::string("unknown metric mode ") + mode +
                              " supported modes are RW,R,W");
