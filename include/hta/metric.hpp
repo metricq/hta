@@ -30,6 +30,7 @@
 #pragma once
 
 #include <hta/exception.hpp>
+#include <hta/meta.hpp>
 #include <hta/types.hpp>
 
 #include <nlohmann/json_fwd.hpp>
@@ -107,6 +108,9 @@ protected:
         int64_t factor_;
     };
 
+public:
+    const Meta meta() const;
+
 protected:
     std::unique_ptr<storage::Metric> storage_metric_;
 
@@ -117,7 +121,7 @@ protected:
     TimePoint previous_time_;
 };
 
-class ReadMetric : protected virtual BaseMetric
+class ReadMetric : public virtual BaseMetric
 {
 public:
     explicit ReadMetric(std::unique_ptr<storage::Metric> storage_metric);
@@ -143,7 +147,7 @@ private:
                                                                            Scope::extended });
 };
 
-class WriteMetric : protected virtual BaseMetric
+class WriteMetric : public virtual BaseMetric
 {
 public:
     explicit WriteMetric(std::unique_ptr<storage::Metric> storage_metric);

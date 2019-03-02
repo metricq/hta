@@ -30,6 +30,7 @@
 #include "storage/metric.hpp"
 
 #include <hta/exception.hpp>
+#include <hta/meta.hpp>
 #include <hta/metric.hpp>
 
 #include <cassert>
@@ -51,6 +52,11 @@ BaseMetric::BaseMetric(std::unique_ptr<storage::Metric> storage_metric)
     {
         throw_exception("interval_min > interval_max");
     }
+}
+
+const Meta BaseMetric::meta() const
+{
+    return storage_metric_->meta();
 }
 
 BaseMetric::~BaseMetric() = default;
