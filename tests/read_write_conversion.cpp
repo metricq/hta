@@ -56,17 +56,17 @@ TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
 
     // "Create read metric for later."
     {
-        json config = { { "type", "file" },
-                        { "path", test_pwd },
-                        {
-                            "metrics",
-                            {
-                                {
-                                    { "name", "test.read" },
-                                    { "mode", "W" },
-                                },
-                            },
-                        } };
+        json config = {
+            { "type", "file" },
+            { "path", test_pwd },
+            { "metrics",
+              {
+                  { "test.read",
+                    {
+                        { "mode", "W" },
+                    } },
+              } },
+        };
 
         auto config_path = test_pwd / "config.json";
         std::ofstream config_file;
@@ -82,25 +82,25 @@ TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
 
     // "Test read, write, and read_write metrics."
     {
-        json config = { { "type", "file" },
-                        { "path", test_pwd },
-                        {
-                            "metrics",
-                            {
-                                {
-                                    { "name", "test.read" },
-                                    { "mode", "R" },
-                                },
-                                {
-                                    { "name", "test.write" },
-                                    { "mode", "W" },
-                                },
-                                {
-                                    { "name", "test.read_write" },
-                                    { "mode", "RW" },
-                                },
-                            },
-                        } };
+        json config = {
+            { "type", "file" },
+            { "path", test_pwd },
+            { "metrics",
+              {
+                  { "test.read",
+                    {
+                        { "mode", "R" },
+                    } },
+                  { "test.write",
+                    {
+                        { "mode", "W" },
+                    } },
+                  { "test.read_write",
+                    {
+                        { "mode", "RW" },
+                    } },
+              } },
+        };
 
         auto config_path = test_pwd / "config.json";
         std::ofstream config_file;

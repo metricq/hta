@@ -55,36 +55,30 @@ TEST_CASE("HTA prefix configuration.", "[hta]")
 
     // "Create read metric for later."
     {
-        json config = { { "type", "file" },
-                        { "path", test_pwd },
-                        {
-                            "metrics",
-                            {
-                                {
-                                    "prefix.",
-                                    {
-                                        { "prefix", true },
-                                        { "mode", "RW" },
-                                        { "interval_min", 13370000000000 },
-                                        { "interval_max", 1337000000000000 },
-                                        { "interval_factor", 13 },
-                                    },
-                                },
-                                {
-                                    "foo",
-                                    {
-                                        { "prefix", false },
-                                        { "mode", "RW" },
-                                    },
-                                },
-                                {
-                                    "bar",
-                                    {
-                                        { "mode", "RW" },
-                                    },
-                                },
-                            },
-                        } };
+        json config = {
+            { "type", "file" },
+            { "path", test_pwd },
+            { "metrics",
+              {
+                  { "prefix.",
+                    {
+                        { "prefix", true },
+                        { "mode", "RW" },
+                        { "interval_min", 13370000000000 },
+                        { "interval_max", 1337000000000000 },
+                        { "interval_factor", 13 },
+                    } },
+                  { "foo",
+                    {
+                        { "prefix", false },
+                        { "mode", "RW" },
+                    } },
+                  { "bar",
+                    {
+                        { "mode", "RW" },
+                    } },
+              } },
+        };
 
         auto config_path = test_pwd / "config.json";
         std::ofstream config_file;

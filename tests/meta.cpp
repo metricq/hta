@@ -53,17 +53,15 @@ TEST_CASE("HTA meta fun.", "[hta]")
     json config = {
         { "type", "file" },
         { "path", test_pwd },
-        {
-            "metrics",
-            {
+        { "metrics",
+          {
+              { "foo",
                 {
-                    { "name", "foo" },
                     { "mode", "RW" },
                     { "interval_min", 1337000000 },
                     { "interval_factor", 42 },
-                },
-            },
-        },
+                } },
+          } },
     };
     {
         hta::Directory dir(config);

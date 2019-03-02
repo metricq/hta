@@ -67,19 +67,19 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     auto created = std::filesystem::create_directories(test_pwd);
     REQUIRE(created);
 
-    json config = { { "type", "file" },
-                    { "path", test_pwd },
-                    {
-                        "metrics",
-                        {
-                            {
-                                { "name", "foo" },
-                                { "mode", "RW" },
-                                { "interval_min", 1000000 },
-                                { "interval_factor", 10 },
-                            },
-                        },
-                    } };
+    json config = {
+        { "type", "file" },
+        { "path", test_pwd },
+        { "metrics",
+          {
+              { "foo",
+                {
+                    { "mode", "RW" },
+                    { "interval_min", 1000000 },
+                    { "interval_factor", 10 },
+                } },
+          } },
+    };
 
     {
         hta::Directory dir(config);

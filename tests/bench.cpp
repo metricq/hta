@@ -42,10 +42,15 @@ using json = nlohmann::json;
 
 void BM_insert(benchmark::State& state)
 {
-    json config;
     auto test_pwd = std::filesystem::current_path() / "hta_bench.tmp";
-    config["type"] = "file";
-    config["path"] = test_pwd;
+    json config = {
+        { "type", "file" },
+        { "path", test_pwd },
+        { "metrics",
+          {
+              { "foo", {} },
+          } },
+    };
     for (auto _ : state)
     {
         // Remove leftovers from past runs

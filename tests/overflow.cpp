@@ -58,20 +58,20 @@ TEST_CASE("Ensure no overflow happens with specific timestamps.", "[hta]")
     auto created = std::filesystem::create_directories(test_pwd);
     REQUIRE(created);
 
-    json config = { { "type", "file" },
-                    { "path", test_pwd },
-                    {
-                        "metrics",
-                        {
-                            {
-                                { "name", "foo" },
-                                { "mode", "RW" },
-                                { "interval_min", 14400000000000 },
-                                { "interval_max", 1440000000000000 },
-                                { "interval_factor", 10 },
-                            },
-                        },
-                    } };
+    json config = {
+        { "type", "file" },
+        { "path", test_pwd },
+        { "metrics",
+          {
+              { "foo",
+                {
+                    { "mode", "RW" },
+                    { "interval_min", 14400000000000 },
+                    { "interval_max", 1440000000000000 },
+                    { "interval_factor", 10 },
+                } },
+          } },
+    };
 
     auto config_path = test_pwd / "config.json";
     std::ofstream config_file;
@@ -89,8 +89,8 @@ TEST_CASE("Ensure no overflow happens with specific timestamps.", "[hta]")
         metric->insert(
             hta::TimeValue(hta::TimePoint(hta::duration_cast(swap_point + delta)), 43.0));
         // We need this to trigger writing another interval high up
-        metric->insert(hta::TimeValue(
-            hta::TimePoint(hta::duration_cast(swap_point + step + delta)), 44.0));
+        metric->insert(
+            hta::TimeValue(hta::TimePoint(hta::duration_cast(swap_point + step + delta)), 44.0));
     }
     REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "raw.hta") > 0);
     REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "14400000000000.hta") > 0);
