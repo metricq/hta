@@ -27,6 +27,7 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#include <hta/chrono.hpp>
 #include <hta/directory.hpp>
 #include <hta/metric.hpp>
 
@@ -41,9 +42,7 @@
 #include <iostream>
 using json = nlohmann::json;
 
-using namespace std::literals::chrono_literals;
-
-TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
+TEST_CASE("HTA prefix configuration.", "[hta]")
 {
     // Unfortunately there are no portable unique temporary directory creation mechanisms
     // Let's just do it in the build folder
@@ -62,8 +61,27 @@ TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
                             "metrics",
                             {
                                 {
-                                    { "name", "test.read" },
-                                    { "mode", "W" },
+                                    "prefix.",
+                                    {
+                                        { "prefix", true },
+                                        { "mode", "RW" },
+                                        { "interval_min", 13370000000000 },
+                                        { "interval_max", 1337000000000000 },
+                                        { "interval_factor", 13 },
+                                    },
+                                },
+                                {
+                                    "foo",
+                                    {
+                                        { "prefix", false },
+                                        { "mode", "RW" },
+                                    },
+                                },
+                                {
+                                    "bar",
+                                    {
+                                        { "mode", "RW" },
+                                    },
                                 },
                             },
                         } };
@@ -76,52 +94,20 @@ TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
         config_file.close();
 
         hta::Directory dir(config_path);
-    }
 
-    REQUIRE(std::filesystem::file_size(test_pwd / "test.read" / "raw.hta") > 0);
+        auto& m = dir.metric("prefix.metric");
+        REQUIRE(m.meta().interval_min == hta::Duration(13370000000000));
+        REQUIRE(m.meta().interval_max == hta::Duration(1337000000000000));
+        REQUIRE(m.meta().interval_factor == 13);
 
-    // "Test read, write, and read_write metrics."
-    {
-        json config = { { "type", "file" },
-                        { "path", test_pwd },
-                        {
-                            "metrics",
-                            {
-                                {
-                                    { "name", "test.read" },
-                                    { "mode", "R" },
-                                },
-                                {
-                                    { "name", "test.write" },
-                                    { "mode", "W" },
-                                },
-                                {
-                                    { "name", "test.read_write" },
-                                    { "mode", "RW" },
-                                },
-                            },
-                        } };
+        REQUIRE_THROWS_AS(dir.metric("invalid.metric"), hta::Exception);
 
-        auto config_path = test_pwd / "config.json";
-        std::ofstream config_file;
-        config_file.exceptions(std::ios::badbit | std::ios::failbit);
-        config_file.open(config_path);
-        config_file << config;
-        config_file.close();
+        REQUIRE_THROWS_AS(dir.metric("foo.metric"), hta::Exception);
+        REQUIRE_THROWS_AS(dir.metric("bar.metric"), hta::Exception);
 
-        hta::Directory dir(config_path);
-        auto rw_as_rw = dir["test.read_write"];
-        auto rw_as_r = dir.read_metric("test.read_write");
-        auto rw_as_w = dir.write_metric("test.read_write");
-        REQUIRE(rw_as_rw == rw_as_r);
-        REQUIRE(rw_as_rw == rw_as_w);
-
-        auto r_as_r = dir.read_metric("test.read");
-        REQUIRE_THROWS_AS(dir["test.read"], hta::Exception);
-        REQUIRE_THROWS_AS(dir.write_metric("test.read"), hta::Exception);
-
-        auto w_as_w = dir.write_metric("test.write");
-        REQUIRE_THROWS_AS(dir["test.write"], hta::Exception);
-        REQUIRE_THROWS_AS(dir.read_metric("test.write"), hta::Exception);
+        dir.metric("prefix."); // technically allowed
+        dir.metric("prefix.other");
+        dir.metric("foo");
+        dir.metric("bar");
     }
 }
