@@ -175,7 +175,7 @@ class VariantMetric
 public:
     using Variant = std::variant<ReadMetric, WriteMetric, ReadWriteMetric>;
 
-    VariantMetric(const hta::json& config, storage::Directory& storage);
+    VariantMetric(const std::string& name, const hta::json& config, storage::Directory& storage);
 
     template <class M>
     M* get()

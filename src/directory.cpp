@@ -68,12 +68,25 @@ Directory::Directory(const json& config)
 
     if (config.count("metrics"))
     {
-        for (const auto& metric : config.at("metrics"))
+        auto& metrics = config.at("metrics");
+        if (metrics.is_array())
         {
-            // TODO prefix handling
-            auto name = metric.at("name").get<std::string>();
+            // Legacy, TODO remove
+            for (const auto& metric_config : metrics)
+            {
+                // TODO prefix handling
+                auto name = metric_config.at("name").get<std::string>();
+                metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                                 std::forward_as_tuple(name, metric_config, *directory_));
+            }
+        }
+        assert(metrics.is_object());
+        for (const auto& elem : metrics.items())
+        {
+            const auto name = elem.key();
+            const auto& metric_config = elem.value();
             metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                             std::forward_as_tuple(metric, *directory_));
+                             std::forward_as_tuple(name, metric_config, *directory_));
         }
     }
 }

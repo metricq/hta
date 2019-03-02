@@ -38,10 +38,10 @@ namespace hta
 {
 using json = nlohmann::json;
 
-VariantMetric::Variant make_variant(const json& config, storage::Directory& storage)
+VariantMetric::Variant make_variant(const std::string& name, const json& config,
+                                    storage::Directory& storage)
 {
     const auto mode = config.at("mode").get<std::string>();
-    const auto name = config.at("name").get<std::string>();
     if (mode == "RW")
     {
         return VariantMetric::Variant(
@@ -62,8 +62,9 @@ VariantMetric::Variant make_variant(const json& config, storage::Directory& stor
                              " supported modes are RW,R,W");
 }
 
-VariantMetric::VariantMetric(const hta::json& config, storage::Directory& storage)
-: metric_(make_variant(config, storage))
+VariantMetric::VariantMetric(const std::string& name, const hta::json& config,
+                             storage::Directory& storage)
+: metric_(make_variant(name, config, storage))
 {
 }
 
