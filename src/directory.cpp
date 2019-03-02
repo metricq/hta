@@ -36,6 +36,7 @@
 
 #include <nlohmann/json.hpp>
 
+#include <cassert>
 #include <memory>
 #include <string>
 
@@ -71,10 +72,9 @@ Directory::Directory(const json& config)
         auto& metrics = config.at("metrics");
         if (metrics.is_array())
         {
-            // Legacy, TODO remove
+            // Legacy, TODO remove, doesn't support prefixes!
             for (const auto& metric_config : metrics)
             {
-                // TODO prefix handling
                 auto name = metric_config.at("name").get<std::string>();
                 metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
                                  std::forward_as_tuple(name, metric_config, *directory_));
@@ -85,8 +85,16 @@ Directory::Directory(const json& config)
         {
             const auto name = elem.key();
             const auto& metric_config = elem.value();
-            metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                             std::forward_as_tuple(name, metric_config, *directory_));
+
+            if (metric_config.count("prefix") && metric_config.at("prefix").get<bool>())
+            {
+                prefixes_.emplace_back(name, metric_config);
+            }
+            else
+            {
+                metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                                 std::forward_as_tuple(name, metric_config, *directory_));
+            }
         }
     }
 }
@@ -103,7 +111,17 @@ std::vector<std::string> Directory::metric_names()
 
 VariantMetric& Directory::create_metric(const std::string& name)
 {
-    // TODO check prefixes and stuff
+    for (const auto& elem : prefixes_)
+    {
+        const auto& prefix = elem.first;
+        if (prefix == name.substr(0, prefix.size()))
+        {
+            auto it = metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                                       std::forward_as_tuple(name, elem.second, *directory_));
+            assert(it.second);
+            return it.first->second;
+        }
+    }
     throw Exception(std::string("no settings found to create metric ") + name);
 }
 
