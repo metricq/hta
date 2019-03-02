@@ -54,21 +54,6 @@ json read_json_from_file(const std::filesystem::path& path)
     return config;
 }
 
-template <class M>
-M* metric_get(std::variant<ReadMetric, WriteMetric, ReadWriteMetric>& v)
-{
-    return std::visit(
-        [](auto&& arg) {
-            using T = std::decay_t<decltype(arg)>;
-            if constexpr (!std::is_convertible_v<T*, M*>)
-            {
-                throw Exception("Invalid metric type (read/write) conversion.");
-            }
-            return (M*)(&arg);
-        },
-        v);
-}
-
 Directory::Directory(const json& config)
 {
     auto type = config.at("type").get<std::string>();
@@ -85,49 +70,10 @@ Directory::Directory(const json& config)
     {
         for (const auto& metric : config.at("metrics"))
         {
-            const auto mode = metric.at("mode").get<std::string>();
-            const auto name = metric.at("name").get<std::string>();
-            bool added;
-
-            if (mode == "RW")
-            {
-                added = metrics_
-                            .emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                     std::forward_as_tuple(
-                                         std::in_place_type<ReadWriteMetric>,
-                                         directory_->open(name, storage::OpenMode::read_write,
-                                                          Meta(metric))))
-                            .second;
-            }
-            else if (mode == "R")
-            {
-                added =
-                    metrics_
-                        .emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                 std::forward_as_tuple(
-                                     std::in_place_type<ReadMetric>,
-                                     directory_->open(name, storage::OpenMode::read, Meta(metric))))
-                        .second;
-            }
-            else if (mode == "W")
-            {
-                added = metrics_
-                            .emplace(
-                                std::piecewise_construct, std::forward_as_tuple(name),
-                                std::forward_as_tuple(
-                                    std::in_place_type<WriteMetric>,
-                                    directory_->open(name, storage::OpenMode::write, Meta(metric))))
-                            .second;
-            }
-            else
-            {
-                throw std::runtime_error(std::string("unknown metric mode: ") + mode);
-            }
-            if (!added)
-            {
-                throw std::runtime_error(std::string("metric ") + name +
-                                         " already exists as metric of mode " + mode);
-            }
+            // TODO prefix handling
+            auto name = metric.at("name").get<std::string>();
+            metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                             std::forward_as_tuple(metric, *directory_));
         }
     }
 }
@@ -142,50 +88,10 @@ std::vector<std::string> Directory::metric_names()
     return directory_->metric_names();
 }
 
-ReadWriteMetric* Directory::operator[](const std::string& name)
+VariantMetric& Directory::create_metric(const std::string& name)
 {
-    auto it = metrics_.find(name);
-    if (it == metrics_.end())
-    {
-        bool added;
-        std::tie(it, added) =
-            metrics_.try_emplace(name, std::in_place_type<ReadWriteMetric>,
-                                 directory_->open(name, storage::OpenMode::read_write));
-        assert(added);
-    }
-    return metric_get<ReadWriteMetric>(it->second);
-}
-
-ReadWriteMetric* Directory::at(const std::string& name)
-{
-    return metric_get<ReadWriteMetric>(metrics_.at(name));
-}
-
-ReadMetric* Directory::read_metric(const std::string& name)
-{
-    auto it = metrics_.find(name);
-    if (it == metrics_.end())
-    {
-        bool added;
-        std::tie(it, added) = metrics_.try_emplace(name, std::in_place_type<ReadMetric>,
-                                                   directory_->open(name, storage::OpenMode::read));
-        assert(added);
-    }
-    return metric_get<ReadMetric>(it->second);
-}
-
-WriteMetric* Directory::write_metric(const std::string& name)
-{
-    auto it = metrics_.find(name);
-    if (it == metrics_.end())
-    {
-        bool added;
-        std::tie(it, added) =
-            metrics_.try_emplace(name, std::in_place_type<WriteMetric>,
-                                 directory_->open(name, storage::OpenMode::write));
-        assert(added);
-    }
-    return metric_get<WriteMetric>(it->second);
+    // TODO check prefixes and stuff
+    throw Exception(std::string("no settings found to create metric ") + name);
 }
 
 Directory::~Directory() = default;

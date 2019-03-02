@@ -1,4 +1,4 @@
-// Copyright (c) 2018, ZIH,
+// Copyright (c) 2019, ZIH,
 // Technische Universitaet Dresden,
 // Federal Republic of Germany
 //
@@ -27,74 +27,44 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#pragma once
 
-#include <hta/filesystem.hpp>
+#include "storage/directory.hpp"
+
 #include <hta/metric.hpp>
 
 #include <nlohmann/json.hpp>
-
-#include <memory>
-#include <string>
-#include <unordered_map>
-#include <utility>
-#include <variant>
-#include <vector>
 
 namespace hta
 {
 using json = nlohmann::json;
 
-namespace storage
+VariantMetric::Variant make_variant(const json& config, storage::Directory& storage)
 {
-    class Directory;
+    const auto mode = config.at("mode").get<std::string>();
+    const auto name = config.at("name").get<std::string>();
+    if (mode == "RW")
+    {
+        return VariantMetric::Variant(
+            std::in_place_type<ReadWriteMetric>,
+            storage.open(name, storage::OpenMode::read_write, Meta(config)));
+    }
+    if (mode == "R")
+    {
+        return VariantMetric::Variant(std::in_place_type<ReadMetric>,
+                                      storage.open(name, storage::OpenMode::read, Meta(config)));
+    }
+    if (mode == "W")
+    {
+        return VariantMetric::Variant(std::in_place_type<ReadMetric>,
+                                      storage.open(name, storage::OpenMode::read, Meta(config)));
+    }
+    throw std::runtime_error(std::string("unknown metric mode ") + mode +
+                             " supported modes are RW,R,W");
 }
 
-class Directory
+VariantMetric::VariantMetric(const hta::json& config, storage::Directory& storage)
+: metric_(make_variant(config, storage))
 {
-public:
-    explicit Directory(const std::filesystem::path& config_path);
-    explicit Directory(const json& config);
-    ~Directory();
+}
 
-private:
-    VariantMetric& create_metric(const std::string&);
-
-public:
-    template <typename M = ReadWriteMetric>
-    M& metric(const std::string& name)
-    {
-        auto it = metrics_.find(name);
-        if (it != metrics_.end())
-        {
-            return *it->second.get<M>();
-        }
-        return *create_metric(name).get<M>();
-    }
-
-    ReadWriteMetric* operator[](const std::string& name)
-    {
-        return &metric<ReadWriteMetric>(name);
-    }
-
-    ReadMetric* read_metric(const std::string& name)
-    {
-        return &metric<ReadMetric>(name);
-    }
-
-    WriteMetric* write_metric(const std::string& name)
-    {
-        return &metric<WriteMetric>(name);
-    }
-
-    std::vector<std::string> metric_names();
-
-private:
-    // static VariantMetric make_metric(const json& config);
-
-private:
-    std::unique_ptr<storage::Directory> directory_;
-    std::unordered_map<std::string, VariantMetric> metrics_;
-    std::vector<std::pair<std::string, json>> prefixes_;
-};
 } // namespace hta

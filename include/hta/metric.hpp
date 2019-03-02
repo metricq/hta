@@ -32,17 +32,23 @@
 #include <hta/exception.hpp>
 #include <hta/types.hpp>
 
+#include <nlohmann/json_fwd.hpp>
+
 #include <chrono>
 #include <map>
 #include <memory>
+#include <variant>
 #include <vector>
 
 namespace hta
 {
+using json = nlohmann::json;
+
 namespace storage
 {
     class Metric;
-}
+    class Directory;
+} // namespace storage
 
 class Level;
 
@@ -111,7 +117,6 @@ protected:
     TimePoint previous_time_;
 };
 
-
 class ReadMetric : protected virtual BaseMetric
 {
 public:
@@ -163,5 +168,31 @@ class ReadWriteMetric : public ReadMetric, public WriteMetric
 {
 public:
     explicit ReadWriteMetric(std::unique_ptr<storage::Metric> storage_metric);
+};
+
+class VariantMetric
+{
+public:
+    using Variant = std::variant<ReadMetric, WriteMetric, ReadWriteMetric>;
+
+    VariantMetric(const hta::json& config, storage::Directory& storage);
+
+    template <class M>
+    M* get()
+    {
+        return std::visit(
+            [](auto&& arg) {
+                using T = std::decay_t<decltype(arg)>;
+                if constexpr (!std::is_convertible_v<T*, M*>)
+                {
+                    throw Exception("Invalid metric type (read/write) conversion.");
+                }
+                return (M*)(&arg);
+            },
+            metric_);
+    }
+
+private:
+    Variant metric_;
 };
 } // namespace hta
