@@ -60,7 +60,7 @@ TEST_CASE("HTA prefix configuration.", "[hta]")
             { "path", test_pwd },
             { "metrics",
               {
-                  { "prefix.",
+                  { "prefix",
                     {
                         { "prefix", true },
                         { "mode", "RW" },

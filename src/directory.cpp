@@ -113,11 +113,13 @@ Directory::Directory(const json& config, bool use_mutex) : mutex_(use_mutex)
             assert(metrics.is_object());
             for (const auto& elem : metrics.items())
             {
-                const auto name = elem.key();
+                std::string name = elem.key();
                 const auto& metric_config = elem.value();
 
                 if (metric_config.count("prefix") && metric_config.at("prefix").get<bool>())
                 {
+                    // add . to end
+                    name += ".";
                     prefixes_.emplace_back(name, metric_config);
                 }
                 else
