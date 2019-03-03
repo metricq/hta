@@ -31,10 +31,12 @@
 
 #include <hta/filesystem.hpp>
 #include <hta/metric.hpp>
+#include <hta/optional_mutex.hpp>
 
 #include <nlohmann/json.hpp>
 
 #include <memory>
+#include <mutex>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -64,10 +66,13 @@ public:
     template <typename M = ReadWriteMetric>
     M& metric(const std::string& name)
     {
-        auto it = metrics_.find(name);
-        if (it != metrics_.end())
         {
-            return *it->second.get<M>();
+            std::lock_guard<OptionalMutex> guard(mutex_);
+            auto it = metrics_.find(name);
+            if (it != metrics_.end())
+            {
+                return *it->second.get<M>();
+            }
         }
         return *create_metric(name).get<M>();
     }
@@ -96,5 +101,6 @@ private:
     std::unique_ptr<storage::Directory> directory_;
     std::unordered_map<std::string, VariantMetric> metrics_;
     std::vector<std::pair<std::string, json>> prefixes_;
+    OptionalMutex mutex_;
 };
 } // namespace hta

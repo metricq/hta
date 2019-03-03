@@ -38,6 +38,7 @@
 #include <chrono>
 #include <map>
 #include <memory>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -52,6 +53,26 @@ namespace storage
 } // namespace storage
 
 class Level;
+
+/**
+ * This is a messy diamond of death
+ *         BaseMetric
+ *        /          \
+ * ReadMetric      WriteMetric
+ *   .   \           /   .
+ *   .  ReadWriteMetric  .
+ *   .         .         .
+ * variant<Read,Write,ReadWrite>
+ *         unique_ptr
+ *       VariantMetric
+ *
+ * VariantMetric such that we can store one thing in the Directory
+ * it must be movable because otherwise we cannot efficiently lock
+ * in-place-map construction
+ *
+ * Some time we really need to clean this up
+ * Either just scrap the concept, or make fully virtual interfaces and stuff.
+ */
 
 class BaseMetric
 {
@@ -193,10 +214,12 @@ public:
                 }
                 return (M*)(&arg);
             },
-            metric_);
+            *metric_);
     }
 
 private:
-    Variant metric_;
+    std::unique_ptr<Variant> metric_;
 };
+
+static_assert(std::is_move_constructible_v<VariantMetric>, "VariantMetric is not movable.");
 } // namespace hta

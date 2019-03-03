@@ -38,6 +38,7 @@
 
 #include <cassert>
 #include <memory>
+#include <mutex>
 #include <string>
 
 namespace hta
@@ -119,10 +120,13 @@ VariantMetric& Directory::create_metric(const std::string& name)
         const auto& prefix = elem.first;
         if (prefix == name.substr(0, prefix.size()))
         {
-            auto it = metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                       std::forward_as_tuple(name, elem.second, *directory_));
-            assert(it.second);
-            return it.first->second;
+            VariantMetric metric(name, elem.second, *directory_);
+            {
+                std::lock_guard<OptionalMutex> lock(mutex_);
+                auto it = metrics_.emplace(name, std::move(metric));
+                assert(it.second);
+                return it.first->second;
+            }
         }
     }
     throw Exception(std::string("no settings found to create metric ") + name);

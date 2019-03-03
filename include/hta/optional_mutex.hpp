@@ -27,51 +27,52 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#pragma once
 
-#include "storage/directory.hpp"
-
-#include <hta/metric.hpp>
-
-#include <nlohmann/json.hpp>
+#include <mutex>
+#include <optional>
 
 namespace hta
 {
-using json = nlohmann::json;
-
-std::unique_ptr<VariantMetric::Variant> make_variant(const std::string& name, const json& config,
-                                                     storage::Directory& storage)
+class OptionalMutex
 {
-    std::string mode = "RW"; // default
-    if (config.count("mode"))
-    {
-        mode = config.at("mode").get<std::string>();
-    }
-    if (mode == "RW")
-    {
-        return std::make_unique<VariantMetric::Variant>(
-            std::in_place_type<ReadWriteMetric>,
-            storage.open(name, storage::OpenMode::read_write, Meta(config)));
-    }
-    if (mode == "R")
-    {
-        return std::make_unique<VariantMetric::Variant>(
-            std::in_place_type<ReadMetric>,
-            storage.open(name, storage::OpenMode::read, Meta(config)));
-    }
-    if (mode == "W")
-    {
-        return std::make_unique<VariantMetric::Variant>(
-            std::in_place_type<WriteMetric>,
-            storage.open(name, storage::OpenMode::write, Meta(config)));
-    }
-    throw std::runtime_error(std::string("unknown metric mode ") + mode +
-                             " supported modes are RW,R,W");
-}
+private:
+    using OPT = std::optional<std::mutex>;
 
-VariantMetric::VariantMetric(const std::string& name, const hta::json& config,
-                             storage::Directory& storage)
-: metric_(make_variant(name, config, storage))
-{
-}
+public:
+    OptionalMutex(bool use_mutex = false)
+    : mutex_(use_mutex ? OPT(std::in_place) : OPT(std::nullopt))
+    {
+    }
 
+    void lock()
+    {
+        if (mutex_.has_value())
+        {
+            mutex_->lock();
+        }
+    }
+
+    bool try_lock()
+    {
+        if (mutex_.has_value())
+        {
+            return mutex_->try_lock();
+        }
+        return true;
+    }
+
+    void unlock()
+    {
+        if (mutex_.has_value())
+        {
+            mutex_->unlock();
+        }
+    }
+
+private:
+    // obviously we cannot change that optional
+    // as that would require a lock!
+    OPT mutex_;
+};
 } // namespace hta
