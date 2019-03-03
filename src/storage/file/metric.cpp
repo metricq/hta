@@ -45,6 +45,11 @@ Meta Metric::meta() const
     };
 }
 
+Mode Metric::mode() const
+{
+    return open_mode_;
+}
+
 void Metric::insert(TimeValue tv)
 {
     file_raw().write(tv);
@@ -393,15 +398,15 @@ Metric::HtaFile& Metric::file_hta(Duration interval)
         bool added;
         switch (open_mode_)
         {
-        case OpenMode::read:
+        case Mode::read:
             std::tie(it, added) =
                 files_hta_.try_emplace(interval, FileOpenTag::Read(), path_hta(interval));
             break;
-        case OpenMode::write:
+        case Mode::write:
             std::tie(it, added) = files_hta_.try_emplace(
                 interval, FileOpenTag::Write(), path_hta(interval), Header(interval, meta()));
             break;
-        case OpenMode::read_write:
+        case Mode::read_write:
             std::tie(it, added) = files_hta_.try_emplace(
                 interval, FileOpenTag::ReadWrite(), path_hta(interval), Header(interval, meta()));
             break;

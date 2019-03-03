@@ -56,6 +56,33 @@ json read_json_from_file(const std::filesystem::path& path)
     return config;
 }
 
+Metric Directory::make_metric(const std::string& name, const hta::json& config)
+{
+    Mode mode = Mode::read_write;
+    if (config.count("mode"))
+    {
+        auto mode_str = config.at("mode").get<std::string>();
+        if (mode_str == "RW")
+        {
+            mode = Mode::read_write;
+        }
+        else if (mode_str == "R")
+        {
+            mode = Mode::read;
+        }
+        else if (mode_str == "W")
+        {
+            mode = Mode::write;
+        }
+        else
+        {
+            throw std::runtime_error(std::string("unknown metric mode ") + mode_str +
+                                     " supported modes are RW,R,W");
+        }
+    }
+    return Metric(directory_->open(name, mode, Meta(config)));
+}
+
 Directory::Directory(const json& config)
 {
     auto type = config.at("type").get<std::string>();
@@ -78,7 +105,7 @@ Directory::Directory(const json& config)
             {
                 auto name = metric_config.at("name").get<std::string>();
                 metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                 std::forward_as_tuple(name, metric_config, *directory_));
+                                 std::forward_as_tuple(make_metric(name, metric_config)));
             }
         }
         else
@@ -96,7 +123,7 @@ Directory::Directory(const json& config)
                 else
                 {
                     metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                     std::forward_as_tuple(name, metric_config, *directory_));
+                                     std::forward_as_tuple(make_metric(name, metric_config)));
                 }
             }
         }
@@ -113,16 +140,24 @@ std::vector<std::string> Directory::metric_names()
     return directory_->metric_names();
 }
 
-VariantMetric& Directory::create_metric(const std::string& name)
+Metric& Directory::operator[](const std::string& name)
 {
+    {
+        std::lock_guard<OptionalMutex> guard(mutex_);
+        auto it = metrics_.find(name);
+        if (it != metrics_.end())
+        {
+            return it->second;
+        }
+    }
     for (const auto& elem : prefixes_)
     {
         const auto& prefix = elem.first;
         if (prefix == name.substr(0, prefix.size()))
         {
-            VariantMetric metric(name, elem.second, *directory_);
+            Metric metric = make_metric(name, elem.second);
             {
-                std::lock_guard<OptionalMutex> lock(mutex_);
+                std::lock_guard<OptionalMutex> guard(mutex_);
                 auto it = metrics_.emplace(name, std::move(metric));
                 assert(it.second);
                 return it.first->second;

@@ -42,7 +42,7 @@ Directory::Directory(const std::filesystem::path& directory) : directory_(direct
 {
 }
 
-std::unique_ptr<storage::Metric> Directory::open(const std::string& name, OpenMode mode, Meta meta)
+std::unique_ptr<storage::Metric> Directory::open(const std::string& name, Mode mode, Meta meta)
 {
     auto path = directory_ / std::filesystem::path(name);
     // Don't do that in the metric itself (member initialization before constructor body)
@@ -60,11 +60,11 @@ std::unique_ptr<storage::Metric> Directory::open(const std::string& name, OpenMo
     }
     switch (mode)
     {
-    case OpenMode::read:
+    case Mode::read:
         return std::make_unique<Metric>(FileOpenTag::Read(), path);
-    case OpenMode::write:
+    case Mode::write:
         return std::make_unique<Metric>(FileOpenTag::Write(), path, meta);
-    case OpenMode::read_write:
+    case Mode::read_write:
         return std::make_unique<Metric>(FileOpenTag::ReadWrite(), path, meta);
     default:
         throw std::logic_error("unknown OpenMode");

@@ -27,51 +27,14 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-#include "storage/directory.hpp"
-
-#include <hta/metric.hpp>
-
-#include <nlohmann/json.hpp>
+#pragma once
 
 namespace hta
 {
-using json = nlohmann::json;
-
-std::unique_ptr<VariantMetric::Variant> make_variant(const std::string& name, const json& config,
-                                                     storage::Directory& storage)
+enum class Mode
 {
-    std::string mode = "RW"; // default
-    if (config.count("mode"))
-    {
-        mode = config.at("mode").get<std::string>();
-    }
-    if (mode == "RW")
-    {
-        return std::make_unique<VariantMetric::Variant>(
-            std::in_place_type<ReadWriteMetric>,
-            storage.open(name, storage::OpenMode::read_write, Meta(config)));
-    }
-    if (mode == "R")
-    {
-        return std::make_unique<VariantMetric::Variant>(
-            std::in_place_type<ReadMetric>,
-            storage.open(name, storage::OpenMode::read, Meta(config)));
-    }
-    if (mode == "W")
-    {
-        return std::make_unique<VariantMetric::Variant>(
-            std::in_place_type<WriteMetric>,
-            storage.open(name, storage::OpenMode::write, Meta(config)));
-    }
-    throw std::runtime_error(std::string("unknown metric mode ") + mode +
-                             " supported modes are RW,R,W");
+    read,
+    write,
+    read_write,
+};
 }
-
-VariantMetric::VariantMetric(const std::string& name, const hta::json& config,
-                             storage::Directory& storage)
-: metric_(make_variant(name, config, storage))
-{
-}
-
-} // namespace hta

@@ -86,40 +86,40 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
+        auto& metric = dir["foo"];
     }
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
-        metric->insert(sample(11s, -37));
+        auto& metric = dir["foo"];
+        metric.insert(sample(11s, -37));
     }
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
-        metric->insert(sample(21s, -36));
-        metric->insert(sample(42s, -30));
+        auto& metric = dir["foo"];
+        metric.insert(sample(21s, -36));
+        metric.insert(sample(42s, -30));
     }
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
-        metric->insert(sample(48s, -20));
-        metric->insert(sample(53s, -10));
-        metric->insert(sample(67s, 0));
+        auto& metric = dir["foo"];
+        metric.insert(sample(48s, -20));
+        metric.insert(sample(53s, -10));
+        metric.insert(sample(67s, 0));
     }
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
-        metric->insert(sample(80s, -10));
+        auto& metric = dir["foo"];
+        metric.insert(sample(80s, -10));
         for (auto i = 101s; i < 200s; i += 1s)
-            metric->insert(sample(i, 20));
-        metric->insert(sample(203s, 31));
-        metric->insert(sample(217s, 35));
+            metric.insert(sample(i, 20));
+        metric.insert(sample(203s, 31));
+        metric.insert(sample(217s, 35));
     }
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
-        metric->insert(sample(219s, 45));
-        metric->insert(sample(225s, 35));
+        auto& metric = dir["foo"];
+        metric.insert(sample(219s, 45));
+        metric.insert(sample(225s, 35));
         // TODO insert points directly at level border and check if it works correctly
     }
 
@@ -127,17 +127,17 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
+        auto& metric = dir["foo"];
 
         // TODO check raw values
 
         {
-            auto result = metric->retrieve(tp(0s), tp(300s), 31);
+            auto result = metric.retrieve(tp(0s), tp(300s), 31);
             CHECK(result.size() == 110);
         }
         constexpr double nsticks = 1e9;
         {
-            auto result = metric->retrieve(tp(0s), tp(300s), 30);
+            auto result = metric.retrieve(tp(0s), tp(300s), 30);
             REQUIRE(result.size() == 21);
 
             CHECK(result[0].time == tp(10s));
@@ -180,11 +180,11 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
             // TODO if we ever fix the "one pixel lost" thing, there will be another interval here
         }
         {
-            auto result = metric->retrieve(tp(0s), tp(300s), 5);
+            auto result = metric.retrieve(tp(0s), tp(300s), 5);
             REQUIRE(result.size() == 21);
         }
         {
-            auto result = metric->retrieve(tp(0s), tp(300s), 3);
+            auto result = metric.retrieve(tp(0s), tp(300s), 3);
             REQUIRE(result.size() == 2);
 
             CHECK(result[0].time == tp(0s));

@@ -29,6 +29,8 @@
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #pragma once
 
+#include "../mode.hpp"
+
 #include <hta/meta.hpp>
 #include <hta/types.hpp>
 
@@ -43,6 +45,7 @@ class Metric
 {
 public:
     virtual Meta meta() const = 0;
+    virtual Mode mode() const = 0;
 
     virtual void insert(TimeValue tv) = 0;
     virtual void insert(Row row) = 0;

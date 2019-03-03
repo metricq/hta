@@ -79,11 +79,11 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     constexpr auto count = 1000000;
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
+        auto& metric = dir["foo"];
 
         for (int i = 0; i < count; i++)
         {
-            metric->insert({ tp(i), double(i) });
+            metric.insert({ tp(i), double(i) });
         }
     }
 
@@ -91,14 +91,14 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
     {
         hta::Directory dir(config_path);
-        auto metric = dir["foo"];
-        CHECK(metric->range().first == tp(0));
-        CHECK(metric->range().second == tp(count - 1));
+        auto& metric = dir["foo"];
+        CHECK(metric.range().first == tp(0));
+        CHECK(metric.range().second == tp(count - 1));
         // Checking out of file timestamps
         {
             // closed-closed on corner timestamps
             auto result =
-                metric->retrieve(tp(0), tp(count - 1), { hta::Scope::closed, hta::Scope::closed });
+                metric.retrieve(tp(0), tp(count - 1), { hta::Scope::closed, hta::Scope::closed });
             CHECK(result.size() == count);
             CHECK(result.at(0).time == tp(0));
             CHECK(result.at(count - 1).time == tp(count - 1));
@@ -106,30 +106,30 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
         {
             // open-open on corner timestamps
             auto result =
-                metric->retrieve(tp(0), tp(count - 1), { hta::Scope::open, hta::Scope::open });
+                metric.retrieve(tp(0), tp(count - 1), { hta::Scope::open, hta::Scope::open });
             CHECK(result.size() == count - 2);
             CHECK(result.at(0).time == tp(1));
             CHECK(result.at(count - 3).time == tp(count - 2));
         }
         {
             // closed-closed out range
-            auto result = metric->retrieve(tp(0, -1), tp(count - 1, 1),
-                                           { hta::Scope::closed, hta::Scope::closed });
+            auto result = metric.retrieve(tp(0, -1), tp(count - 1, 1),
+                                          { hta::Scope::closed, hta::Scope::closed });
             CHECK(result.size() == count);
             CHECK(result.at(0).time == tp(0));
             CHECK(result.at(count - 1).time == tp(count - 1));
         }
         {
             // open-open out range
-            auto result = metric->retrieve(tp(0, -1), tp(count - 1, 1),
-                                           { hta::Scope::open, hta::Scope::open });
+            auto result = metric.retrieve(tp(0, -1), tp(count - 1, 1),
+                                          { hta::Scope::open, hta::Scope::open });
             CHECK(result.size() == count);
             CHECK(result.at(0).time == tp(0));
             CHECK(result.at(count - 1).time == tp(count - 1));
         }
         {
             auto result =
-                metric->retrieve(tp(0), tp(count - 1), { hta::Scope ::closed, hta::Scope::open });
+                metric.retrieve(tp(0), tp(count - 1), { hta::Scope ::closed, hta::Scope::open });
             CHECK(result.size() == count - 1);
             CHECK(result.at(0).time == tp(0));
             CHECK(result.at(count - 2).time == tp(count - 2));
@@ -140,7 +140,7 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
             auto count_200 = [&metric](int64_t begin_epsilon, int64_t end_epsilon,
                                        hta::IntervalScope interval_scope) {
                 return metric
-                    ->retrieve(tp(10100, begin_epsilon), tp(10300, end_epsilon), interval_scope)
+                    .retrieve(tp(10100, begin_epsilon), tp(10300, end_epsilon), interval_scope)
                     .size();
             };
             {
@@ -191,8 +191,8 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
             auto count_2 = [&metric](int64_t begin_epsilon, int64_t end_epsilon,
                                      hta::IntervalScope interval_scope) {
                 return metric
-                    ->retrieve(tp(10100, begin_epsilon), tp(10300, end_epsilon),
-                               hta::duration_cast(100s), interval_scope)
+                    .retrieve(tp(10100, begin_epsilon), tp(10300, end_epsilon),
+                              hta::duration_cast(100s), interval_scope)
                     .size();
             };
             {

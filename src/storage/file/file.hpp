@@ -54,15 +54,15 @@ namespace FileOpenTag
 {
     struct Read
     {
-        static constexpr OpenMode mode = OpenMode::read;
+        static constexpr Mode mode = Mode::read;
     };
     struct Write
     {
-        static constexpr OpenMode mode = OpenMode::write;
+        static constexpr Mode mode = Mode::write;
     };
     struct ReadWrite
     {
-        static constexpr OpenMode mode = OpenMode::read_write;
+        static constexpr Mode mode = Mode::read_write;
     };
 } // namespace FileOpenTag
 

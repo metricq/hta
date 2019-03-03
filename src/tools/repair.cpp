@@ -52,7 +52,7 @@ json read_json_from_file(const std::filesystem::path& path)
     return config;
 }
 
-void raw_copy(hta::ReadMetric& src, hta::WriteMetric& dst, hta::Duration chunk_interval)
+void raw_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval)
 {
     auto total_range = src.range();
     size_t processed = 0;
@@ -91,6 +91,6 @@ int main(int argc, char* argv[])
     hta::Directory directory(config);
 
     std::cout.imbue(std::locale(""));
-    raw_copy(*directory.read_metric(src_name), *directory.write_metric(dst_name),
+    raw_copy(directory[src_name], directory[dst_name],
              hta::duration_cast(std::chrono::hours(1024)));
 }

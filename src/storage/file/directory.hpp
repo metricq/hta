@@ -56,7 +56,7 @@ class Directory : public storage::Directory
 public:
     explicit Directory(const std::filesystem::path& directory);
     std::unique_ptr<storage::Metric> open(const std::string& name,
-                                          OpenMode mode = OpenMode::read_write,
+                                          Mode mode = Mode::read_write,
                                           Meta meta = Meta()) override;
 
     std::vector<std::string> metric_names() override;

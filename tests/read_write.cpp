@@ -48,7 +48,7 @@ TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
     // Unfortunately there are no portable unique temporary directory creation mechanisms
     // Let's just do it in the build folder
     // Also we don't clean up if a test fails - so we can inspect what the problem seems to be
-    auto test_pwd = std::filesystem::current_path() / "hta_conversion.tmp";
+    auto test_pwd = std::filesystem::current_path() / "hta_read_write.tmp";
     // Remove leftovers from past runs
     std::filesystem::remove_all(test_pwd);
     auto created = std::filesystem::create_directories(test_pwd);
@@ -110,18 +110,22 @@ TEST_CASE("HTA metrics are totally typesafe.", "[hta]")
         config_file.close();
 
         hta::Directory dir(config_path);
-        auto rw_as_rw = dir["test.read_write"];
-        auto rw_as_r = dir.read_metric("test.read_write");
-        auto rw_as_w = dir.write_metric("test.read_write");
-        REQUIRE(rw_as_rw == rw_as_r);
-        REQUIRE(rw_as_rw == rw_as_w);
+        hta::TimeValue test_sample(hta::TimePoint(hta::Duration(23)), 42.0);
 
-        auto r_as_r = dir.read_metric("test.read");
-        REQUIRE_THROWS_AS(dir["test.read"], hta::Exception);
-        REQUIRE_THROWS_AS(dir.write_metric("test.read"), hta::Exception);
+        auto& rw = dir["test.read_write"];
+        rw.insert(test_sample);
+        rw.retrieve(hta::TimePoint(hta::Duration(22)), hta::TimePoint(hta::Duration(24)), 100);
 
-        auto w_as_w = dir.write_metric("test.write");
-        REQUIRE_THROWS_AS(dir["test.write"], hta::Exception);
-        REQUIRE_THROWS_AS(dir.read_metric("test.write"), hta::Exception);
+        auto& r = dir["test.read"];
+        REQUIRE_THROWS_AS(r.insert(test_sample), hta::Exception);
+        auto result =
+            r.retrieve(hta::TimePoint(hta::Duration(22)), hta::TimePoint(hta::Duration(24)), 100);
+        REQUIRE(result.size() == 0);
+
+        auto& w = dir["test.write"];
+        w.insert(test_sample);
+        REQUIRE_THROWS_AS(
+            w.retrieve(hta::TimePoint(hta::Duration(22)), hta::TimePoint(hta::Duration(24)), 100),
+            hta::Exception);
     }
 }

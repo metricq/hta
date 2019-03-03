@@ -83,11 +83,11 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
     {
         hta::Directory dir(config);
-        auto metric = dir["foo"];
+        auto& metric = dir["foo"];
 
         for (int i = 0; i < 1000000; i++)
         {
-            metric->insert(sample(i, i / 3.0));
+            metric.insert(sample(i, i / 3.0));
         }
     }
 
@@ -95,17 +95,17 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
     {
         hta::Directory dir(config);
-        auto metric = dir["foo"];
+        auto& metric = dir["foo"];
 
         // TODO check raw values
         {
-            auto result = metric->retrieve(tp(0s), tp(10000s), hta::duration_cast(1000000ns));
+            auto result = metric.retrieve(tp(0s), tp(10000s), hta::duration_cast(1000000ns));
         }
         {
-            auto result = metric->retrieve(tp(0s), tp(10000s), hta::duration_cast(10000000ns));
+            auto result = metric.retrieve(tp(0s), tp(10000s), hta::duration_cast(10000000ns));
         }
         {
-            auto result = metric->retrieve(tp(0s), tp(10000s), hta::duration_cast(100000000ns));
+            auto result = metric.retrieve(tp(0s), tp(10000s), hta::duration_cast(100000000ns));
         }
     }
 }

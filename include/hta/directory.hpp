@@ -59,47 +59,16 @@ public:
     explicit Directory(const json& config);
     ~Directory();
 
-private:
-    VariantMetric& create_metric(const std::string&);
-
-public:
-    template <typename M = ReadWriteMetric>
-    M& metric(const std::string& name)
-    {
-        {
-            std::lock_guard<OptionalMutex> guard(mutex_);
-            auto it = metrics_.find(name);
-            if (it != metrics_.end())
-            {
-                return *it->second.get<M>();
-            }
-        }
-        return *create_metric(name).get<M>();
-    }
-
-    ReadWriteMetric* operator[](const std::string& name)
-    {
-        return &metric<ReadWriteMetric>(name);
-    }
-
-    ReadMetric* read_metric(const std::string& name)
-    {
-        return &metric<ReadMetric>(name);
-    }
-
-    WriteMetric* write_metric(const std::string& name)
-    {
-        return &metric<WriteMetric>(name);
-    }
-
     std::vector<std::string> metric_names();
 
+    Metric& operator[](const std::string& name);
+
 private:
-    // static VariantMetric make_metric(const json& config);
+    Metric make_metric(const std::string& name, const json& config);
 
 private:
     std::unique_ptr<storage::Directory> directory_;
-    std::unordered_map<std::string, VariantMetric> metrics_;
+    std::unordered_map<std::string, Metric> metrics_;
     std::vector<std::pair<std::string, json>> prefixes_;
     OptionalMutex mutex_;
 };

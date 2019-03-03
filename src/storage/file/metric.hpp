@@ -114,6 +114,7 @@ public:
     }
 
     Meta meta() const override;
+    Mode mode() const override;
 
     void insert(TimeValue tv) override;
     void insert(Row row) override;
@@ -157,7 +158,7 @@ private:
     HtaFile& file_hta(Duration interval);
 
 private:
-    OpenMode open_mode_;
+    Mode open_mode_;
     std::filesystem::path path_;
     RawFile file_raw_;
     // TODO use better data structure to optimize accesses for lowest interval

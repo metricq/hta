@@ -74,13 +74,9 @@ class Level;
  * Either just scrap the concept, or make fully virtual interfaces and stuff.
  */
 
-class BaseMetric
+class Metric
 {
 protected:
-    BaseMetric();
-    explicit BaseMetric(std::unique_ptr<storage::Metric> storage_metric);
-    virtual ~BaseMetric();
-
     // These classes should not be visible outside
     class IntervalFactor
     {
@@ -129,28 +125,22 @@ protected:
         int64_t factor_;
     };
 
-public:
+public: // common
+    explicit Metric(std::unique_ptr<storage::Metric> storage_metric);
+
+    Metric(const Metric&) = delete;
+    Metric& operator=(const Metric&) = delete;
+    Metric(Metric&&);
+    Metric& operator=(Metric&&);
+    ~Metric();
+
     const Meta meta() const;
 
-protected:
-    std::unique_ptr<storage::Metric> storage_metric_;
+private: // common
+    void check_read() const;
+    void check_write() const;
 
-    Duration interval_min_;
-    Duration interval_max_;
-    IntervalFactor interval_factor_;
-
-    TimePoint previous_time_;
-};
-
-class ReadMetric : public virtual BaseMetric
-{
-public:
-    explicit ReadMetric(std::unique_ptr<storage::Metric> storage_metric);
-
-protected:
-    ReadMetric();
-
-public:
+public: // read
     std::vector<Row> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
     std::vector<Row> retrieve(TimePoint begin, TimePoint end, Duration interval_max,
@@ -162,64 +152,32 @@ public:
     size_t count();
     std::pair<TimePoint, TimePoint> range();
 
-private:
+private: // read
     std::vector<Row> retrieve_raw_row(TimePoint begin, TimePoint end,
                                       IntervalScope scope = IntervalScope{ Scope::closed,
                                                                            Scope::extended });
-};
 
-class WriteMetric : public virtual BaseMetric
-{
-public:
-    explicit WriteMetric(std::unique_ptr<storage::Metric> storage_metric);
-    ~WriteMetric();
-
-protected:
-    WriteMetric();
-
-public:
+public: // write
     void insert(TimeValue tv);
     void flush();
 
-private:
+private: // write
     void insert(Row row);
     Level& get_level(Duration interval);
     Level restore_level(Duration interval);
 
+private: // common
+    std::unique_ptr<storage::Metric> storage_metric_;
+
+    Duration interval_min_;
+    Duration interval_max_;
+    IntervalFactor interval_factor_;
+
+    TimePoint previous_time_;
+
+private: // write
     std::map<Duration, Level> levels_;
 };
 
-class ReadWriteMetric : public ReadMetric, public WriteMetric
-{
-public:
-    explicit ReadWriteMetric(std::unique_ptr<storage::Metric> storage_metric);
-};
-
-class VariantMetric
-{
-public:
-    using Variant = std::variant<ReadMetric, WriteMetric, ReadWriteMetric>;
-
-    VariantMetric(const std::string& name, const hta::json& config, storage::Directory& storage);
-
-    template <class M>
-    M* get()
-    {
-        return std::visit(
-            [](auto&& arg) {
-                using T = std::decay_t<decltype(arg)>;
-                if constexpr (!std::is_convertible_v<T*, M*>)
-                {
-                    throw Exception("Invalid metric type (read/write) conversion.");
-                }
-                return (M*)(&arg);
-            },
-            *metric_);
-    }
-
-private:
-    std::unique_ptr<Variant> metric_;
-};
-
-static_assert(std::is_move_constructible_v<VariantMetric>, "VariantMetric is not movable.");
+static_assert(std::is_move_constructible_v<Metric>, "Metric is not movable.");
 } // namespace hta

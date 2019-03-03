@@ -27,35 +27,160 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#include "storage/metric.hpp"
 #include "level.hpp"
 
-#include "storage/metric.hpp"
-
+#include <hta/exception.hpp>
+#include <hta/meta.hpp>
 #include <hta/metric.hpp>
 #include <hta/ostream.hpp>
-#include <hta/types.hpp>
 
-#include <stdexcept>
-#include <tuple>
+#include <algorithm>
+#include <utility>
+#include <vector>
 
 #include <cassert>
 
 namespace hta
 {
-WriteMetric::WriteMetric()
+/*
+ * common methods
+ */
+
+Metric::Metric(std::unique_ptr<storage::Metric> storage_metric)
+: storage_metric_(std::move(storage_metric)), interval_min_(storage_metric_->meta().interval_min),
+  interval_max_(storage_metric_->meta().interval_max),
+  interval_factor_(storage_metric_->meta().interval_factor),
+  previous_time_(storage_metric_->range().second)
 {
-    // just to be sure that we are initialized properly
-    assert(storage_metric_);
+    if (interval_min_ > interval_max_)
+    {
+        throw_exception("interval_min > interval_max");
+    }
 }
 
-WriteMetric::~WriteMetric() = default;
+Metric::Metric(hta::Metric&&) = default;
+Metric& Metric::operator=(hta::Metric&&) = default;
+Metric::~Metric() = default;
 
-WriteMetric::WriteMetric(std::unique_ptr<storage::Metric> storage_metric)
-: BaseMetric(std::move(storage_metric))
+const Meta Metric::meta() const
 {
+    return storage_metric_->meta();
 }
 
-Level WriteMetric::restore_level(Duration interval)
+void Metric::check_read() const
+{
+    switch (storage_metric_->mode())
+    {
+    case Mode::read:
+    case Mode::read_write:
+        return;
+    case Mode::write:
+        throw Exception("attempting to read from metric opened for write only.");
+    }
+}
+
+void Metric::check_write() const
+{
+    switch (storage_metric_->mode())
+    {
+    case Mode::write:
+    case Mode::read_write:
+        return;
+    case Mode::read:
+        throw Exception("attempting to write to metric opened for read only.");
+    }
+}
+
+/*
+ * read methods
+ */
+
+std::vector<Row> Metric::retrieve_raw_row(TimePoint begin, TimePoint end, IntervalScope scope)
+{
+    auto result_tv = storage_metric_->get(begin, end, scope);
+    std::vector<Row> result;
+    result.reserve(result_tv.size());
+    for (auto tv : result_tv)
+    {
+        result.emplace_back(Duration(0), tv.time, Aggregate(tv.value));
+    }
+    return result;
+}
+
+std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, IntervalScope scope)
+{
+    check_read();
+    return storage_metric_->get(begin, end, scope);
+}
+
+size_t Metric::count(TimePoint begin, TimePoint end, IntervalScope scope)
+{
+    check_read();
+    return storage_metric_->count(begin, end, scope);
+}
+
+size_t Metric::count()
+{
+    check_read();
+    return storage_metric_->size();
+}
+
+std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
+                                  IntervalScope scope)
+{
+    check_read();
+    assert(begin <= end);
+    auto duration = end - begin;
+    auto interval_max_length = duration / min_samples;
+    return retrieve(begin, end, interval_max_length, scope);
+}
+
+std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration interval_upper_limit,
+                                  IntervalScope scope)
+{
+    check_read();
+    if (interval_upper_limit < interval_min_)
+    {
+        return retrieve_raw_row(begin, end, scope);
+    }
+    auto interval = interval_min_;
+    interval_upper_limit = std::min(interval_upper_limit, interval_max_);
+    while (interval * interval_factor_ <= interval_upper_limit)
+    {
+        interval = interval * interval_factor_;
+    }
+    do
+    {
+        auto result = storage_metric_->get(begin, end, interval, scope);
+        if (!result.empty())
+        {
+            std::vector<Row> rows;
+            rows.reserve(result.size());
+            std::transform(result.begin(), result.end(), std::back_inserter(rows),
+                           [interval](TimeAggregate ta) -> Row {
+                               return { interval, ta };
+                           });
+            return rows;
+        }
+        // If the requested level has no data yet, we must ask the lower levels
+        interval = interval / interval_factor_;
+    } while (interval >= interval_min_);
+    // No data at all
+    return {};
+}
+
+std::pair<TimePoint, TimePoint> Metric::range()
+{
+    check_read();
+    return storage_metric_->range();
+}
+
+/*
+ * write methods
+ */
+
+Level Metric::restore_level(Duration interval)
 {
     Level level;
     if (storage_metric_->size() == 0)
@@ -103,7 +228,7 @@ Level WriteMetric::restore_level(Duration interval)
     return level;
 }
 
-Level& WriteMetric::get_level(Duration interval)
+Level& Metric::get_level(Duration interval)
 {
     auto it = levels_.find(interval);
     if (it == levels_.end())
@@ -114,8 +239,9 @@ Level& WriteMetric::get_level(Duration interval)
     return it->second;
 }
 
-void WriteMetric::insert(TimeValue tv)
+void Metric::insert(TimeValue tv)
 {
+    check_write();
     // Evaluate if these two consistency checks hurt performance
     // Must not have an "invalid" time value... who knows what would happen...
     if (!tv.time)
@@ -165,7 +291,7 @@ void WriteMetric::insert(TimeValue tv)
     level.advance(tv);
 }
 
-void WriteMetric::insert(Row row)
+void Metric::insert(Row row)
 {
     const auto interval = row.interval * interval_factor_;
     if (interval > interval_max_)
@@ -208,8 +334,9 @@ void WriteMetric::insert(Row row)
     level.advance({ row.end_time(), row.aggregate });
 }
 
-void WriteMetric::flush()
+void Metric::flush()
 {
+    check_write();
     storage_metric_->flush();
 }
 } // namespace hta

@@ -89,19 +89,19 @@ TEST_CASE("HTA prefix configuration.", "[hta]")
 
         hta::Directory dir(config_path);
 
-        auto& m = dir.metric("prefix.metric");
+        auto& m = dir["prefix.metric"];
         REQUIRE(m.meta().interval_min == hta::Duration(13370000000000));
         REQUIRE(m.meta().interval_max == hta::Duration(1337000000000000));
         REQUIRE(m.meta().interval_factor == 13);
 
-        REQUIRE_THROWS_AS(dir.metric("invalid.metric"), hta::Exception);
+        REQUIRE_THROWS_AS(dir["invalid.metric"], hta::Exception);
 
-        REQUIRE_THROWS_AS(dir.metric("foo.metric"), hta::Exception);
-        REQUIRE_THROWS_AS(dir.metric("bar.metric"), hta::Exception);
+        REQUIRE_THROWS_AS(dir["foo.metric"], hta::Exception);
+        REQUIRE_THROWS_AS(dir["bar.metric"], hta::Exception);
 
-        dir.metric("prefix."); // technically allowed
-        dir.metric("prefix.other");
-        dir.metric("foo");
-        dir.metric("bar");
+        dir["prefix."]; // technically allowed
+        dir["prefix.other"];
+        dir["foo"];
+        dir["bar"];
     }
 }
