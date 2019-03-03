@@ -83,7 +83,7 @@ Metric Directory::make_metric(const std::string& name, const hta::json& config)
     return Metric(directory_->open(name, mode, Meta(config)));
 }
 
-Directory::Directory(const json& config)
+Directory::Directory(const json& config, bool use_mutex) : mutex_(use_mutex)
 {
     auto type = config.at("type").get<std::string>();
     if (type == "file")
@@ -130,8 +130,8 @@ Directory::Directory(const json& config)
     }
 }
 
-Directory::Directory(const std::filesystem::path& config_path)
-: Directory(read_json_from_file(config_path))
+Directory::Directory(const std::filesystem::path& config_path, bool use_mutex)
+: Directory(read_json_from_file(config_path), use_mutex)
 {
 }
 

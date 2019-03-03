@@ -55,8 +55,8 @@ namespace storage
 class Directory
 {
 public:
-    explicit Directory(const std::filesystem::path& config_path);
-    explicit Directory(const json& config);
+    explicit Directory(const std::filesystem::path& config_path, bool use_mutex = false);
+    explicit Directory(const json& config, bool use_mutex = false);
     ~Directory();
 
     std::vector<std::string> metric_names();
