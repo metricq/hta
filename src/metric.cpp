@@ -36,6 +36,7 @@
 #include <hta/ostream.hpp>
 
 #include <algorithm>
+#include <limits>
 #include <utility>
 #include <vector>
 
@@ -112,6 +113,124 @@ std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, Interval
 {
     check_read();
     return storage_metric_->get(begin, end, scope);
+}
+
+Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
+{
+    check_read();
+
+    auto interval = interval_min_;
+
+    auto next_begin = interval_end(begin - Duration(1), interval);
+    auto next_end = interval_begin(end, interval);
+
+    Aggregate a;
+
+    if (next_begin >= next_end)
+    {
+        // No need to go to any intervals or do any splits, just one raw chunk
+        auto raw = storage_metric_->get(begin, next_begin,
+                                        IntervalScope{ Scope::closed, Scope::extended });
+
+        auto previous_time = begin;
+        for (auto tv : raw)
+        {
+            assert(previous_time <= tv.time);
+            if (tv.time > end)
+            {
+                tv.time = end;
+            }
+            a += Aggregate(tv.value, tv.time - previous_time);
+            previous_time = tv.time;
+        }
+        return a;
+    }
+    {
+        // Add left raw side
+        auto left_raw = storage_metric_->get(begin, next_begin,
+                                             IntervalScope{ Scope::closed, Scope::extended });
+
+        auto previous_time = begin;
+        for (auto tv : left_raw)
+        {
+            assert(previous_time <= tv.time);
+            if (tv.time >= next_begin)
+            {
+                // We add this for the integral but the point isn't actually in
+                auto partial_duration = next_begin - previous_time;
+                Aggregate partial_interval{
+                    tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
+                };
+                a += partial_interval;
+            }
+            else
+            {
+                a += Aggregate(tv.value, tv.time - previous_time);
+            }
+            previous_time = tv.time;
+        }
+    }
+    {
+        // Add right raw side
+        auto right_raw =
+            storage_metric_->get(next_end, end, IntervalScope{ Scope::closed, Scope::extended });
+        auto previous_time = next_end;
+        for (auto tv : right_raw)
+        {
+            if (tv.time >= end)
+            {
+                // We add this for the integral but the point isn't actually in
+                auto partial_duration = end - previous_time;
+                Aggregate partial_interval{
+                    tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
+                };
+                a += partial_interval;
+            }
+            else
+            {
+                a += Aggregate(tv.value, tv.time - previous_time);
+            }
+        }
+    }
+
+    while (true)
+    {
+        auto next_interval = interval * interval_factor_;
+        next_begin = interval_end(begin - Duration(1), next_interval);
+        next_end = interval_begin(end, next_interval);
+
+        if (next_interval > interval_max_ ||
+            interval_end(begin, next_interval) >= interval_begin(end, next_interval))
+        {
+            // Use contiguous block and end
+            auto rows = storage_metric_->get(begin, interval_begin(end, interval), interval,
+                                             IntervalScope{ Scope::closed, Scope::open });
+            for (const auto& ta : rows)
+            {
+                a += ta.aggregate;
+            }
+            break;
+        }
+
+        // add left aggregates
+        auto rows_left = storage_metric_->get(begin, next_begin, interval,
+                                              IntervalScope{ Scope::closed, Scope::open });
+        for (const auto& ta : rows_left)
+        {
+            a += ta.aggregate;
+        }
+
+        // add right aggregates
+        auto rows_right = storage_metric_->get(next_end, interval_begin(end, interval), interval,
+                                               IntervalScope{ Scope::closed, Scope::open });
+        for (const auto& ta : rows_right)
+        {
+            a += ta.aggregate;
+        }
+
+        interval = next_interval;
+    }
+    return a;
 }
 
 size_t Metric::count(TimePoint begin, TimePoint end, IntervalScope scope)

@@ -147,6 +147,8 @@ public: // read
                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
     std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
                                     IntervalScope scope = { Scope::closed, Scope::extended });
+    // technically this is IntervalScope{ Scope::open, Scope::closed } and used LAST semantics
+    Aggregate aggregate(TimePoint begin, TimePoint end);
     size_t count(TimePoint begin, TimePoint end,
                  IntervalScope scope = { Scope::closed, Scope::extended });
     size_t count();
