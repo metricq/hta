@@ -27,7 +27,9 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#include <hta/exception.hpp>
 #include <hta/meta.hpp>
+#include <hta/ostream.hpp>
 
 #include <nlohmann/json.hpp>
 
@@ -48,6 +50,19 @@ Meta::Meta(const json& config)
     if (config.count("interval_max"))
     {
         interval_max = Duration(config["interval_max"]);
+    }
+    if (interval_min.count() % interval_factor != 0)
+    {
+        throw_exception("interval_min of ", interval_min, " not divisible by ", interval_factor);
+    }
+    if (interval_min.count() <= 0)
+    {
+        throw_exception("interval_min not positive ", interval_min);
+    }
+    if (interval_max < interval_min)
+    {
+        throw_exception("interval_max (", interval_max, ")not larger than interval_min (",
+                        interval_min, ")");
     }
 }
 } // namespace hta

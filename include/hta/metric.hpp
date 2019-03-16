@@ -103,11 +103,11 @@ protected:
 
         Duration divide_by(Duration duration) const
         {
-            auto result = duration / factor_;
-            if (result.count() == 0)
+            if (duration.count() % factor_ != 0 || duration.count() <= 0)
             {
-                throw_exception("interval division yields 0");
+                throw_exception("interval ", duration.count(), " not divisible by ", factor_);
             }
+            auto result = duration / factor_;
             return Duration(result);
         }
 
