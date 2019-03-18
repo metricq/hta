@@ -66,7 +66,7 @@ TEST_CASE("HTA prefix configuration.", "[hta]")
                         { "mode", "RW" },
                         { "interval_min", 13370000000000 },
                         { "interval_max", 1337000000000000 },
-                        { "interval_factor", 13 },
+                        { "interval_factor", 20 },
                     } },
                   { "foo",
                     {
@@ -92,7 +92,7 @@ TEST_CASE("HTA prefix configuration.", "[hta]")
         auto& m = dir["prefix.metric"];
         REQUIRE(m.meta().interval_min == hta::Duration(13370000000000));
         REQUIRE(m.meta().interval_max == hta::Duration(1337000000000000));
-        REQUIRE(m.meta().interval_factor == 13);
+        REQUIRE(m.meta().interval_factor == 20);
 
         REQUIRE_THROWS_AS(dir["invalid.metric"], hta::Exception);
 
