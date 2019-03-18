@@ -85,10 +85,10 @@ int main(int argc, char* argv[])
 
     hta::Directory out_directory(config);
 
-    // 2018-03-14T00:00:00+00:00
-    hta::TimePoint time_base(hta::Duration(1520985600ll * 1000000000));
-    auto duration = std::chrono::hours(24 * 7);
-    auto interval = std::chrono::microseconds(1);
+    // 2018-01-01T00:00:00+00:00
+    hta::TimePoint time_base(hta::Duration(1514764800ll * 1000000000));
+    auto duration = std::chrono::hours(24 * 365);
+    auto interval = std::chrono::milliseconds(1);
 
     for (int i = 0; i < 6; i++)
     {
