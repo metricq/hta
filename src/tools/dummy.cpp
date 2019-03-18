@@ -38,6 +38,8 @@
 #include <cstdint>
 #include <cstdlib>
 
+#include "pcg_random.hpp"
+
 using json = nlohmann::json;
 
 json read_json_from_file(const std::filesystem::path& path)
@@ -53,27 +55,52 @@ json read_json_from_file(const std::filesystem::path& path)
 int main(int argc, char* argv[])
 {
     std::string config_file = "config.json";
-    std::int64_t count = 600000000;
     if (argc > 1)
     {
         config_file = argv[1];
     }
-    if (argc > 2)
-    {
-        count = atoll(argv[2]);
-    }
-    std::string metric_name = "dummy";
-
     auto config = read_json_from_file(std::filesystem::path(config_file));
-    hta::Directory out_directory(config);
-    auto& metric = out_directory[metric_name];
-    for (std::int64_t row = 0; row < count; row++)
+
+    std::string metric_prefix = "bench.s0.";
+
+    std::ifstream file;
+    file.exceptions(std::ifstream::badbit);
+    std::string filename = config.at("value_file");
+    file.open(filename);
+    file.seekg(0, std::fstream::end);
+
+    std::vector<double> fake_values;
+    auto size_bytes = file.tellg();
+    if (size_bytes == 0 || size_bytes % sizeof(hta::Value))
     {
-        if (row % 1000000 == 0)
+        throw std::runtime_error("file size empty or not a multiple of sizeof metricq::Value");
+    }
+
+    fake_values.resize(size_bytes / sizeof(hta::Value));
+    file.seekg(0);
+    file.read(reinterpret_cast<char*>(fake_values.data()), size_bytes);
+
+    pcg64 random;
+    std::uniform_int_distribution<size_t> distribution(0, fake_values.size() - 1);
+
+    hta::Directory out_directory(config);
+
+    // 2018-03-14T00:00:00+00:00
+    hta::TimePoint time_base(hta::Duration(1520985600ll * 1000000000));
+    auto duration = std::chrono::hours(24 * 7);
+    auto interval = std::chrono::microseconds(1);
+
+    for (int i = 0; i < 6; i++)
+    {
+        auto fake_value_iter = fake_values.begin() + distribution(random);
+        auto& metric = out_directory[metric_prefix + std::to_string(i)];
+        for (std::chrono::nanoseconds time_off; time_off < duration; time_off += interval)
         {
-            std::cout << row << " rows completed." << std::endl;
+            metric.insert(hta::TimeValue(time_base + time_off, *fake_value_iter));
+            if (++fake_value_iter == fake_values.end())
+            {
+                fake_value_iter = fake_values.begin();
+            }
         }
-        metric.insert(hta::TimeValue(
-            hta::TimePoint(hta::duration_cast(std::chrono::milliseconds(1 + 50 * row))), 42.0));
     }
 }
