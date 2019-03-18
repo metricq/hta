@@ -59,14 +59,14 @@ void BM_insert(benchmark::State& state)
         (void)created;
         assert(created);
         hta::Directory dir(config);
-        auto metric = dir["foo"];
+        auto& metric = dir["foo"];
 
         auto time = hta::TimePoint(hta::Duration(1519832293179227888));
         auto time_delta = hta::Duration(state.range(1));
         auto start = std::chrono::high_resolution_clock::now();
         for (int64_t i = 0; i < state.range(0); i++)
         {
-            metric->insert({ time, i + 1. / 3. });
+            metric.insert({ time, i + 1. / 3. });
             time += time_delta;
         }
         auto end = std::chrono::high_resolution_clock::now();
