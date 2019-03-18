@@ -58,7 +58,7 @@ TEST_CASE("HTA meta fun.", "[hta]")
               { "foo",
                 {
                     { "mode", "RW" },
-                    { "interval_min", 1337000000 },
+                    { "interval_min", 1337000028 },
                     { "interval_factor", 42 },
                 } },
           } },
