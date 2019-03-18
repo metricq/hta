@@ -94,7 +94,7 @@ int main(int argc, char* argv[])
     {
         auto fake_value_iter = fake_values.begin() + distribution(random);
         auto& metric = out_directory[metric_prefix + std::to_string(i)];
-        for (std::chrono::nanoseconds time_off; time_off < duration; time_off += interval)
+        for (std::chrono::nanoseconds time_off {0}; time_off < duration; time_off += interval)
         {
             metric.insert(hta::TimeValue(time_base + time_off, *fake_value_iter));
             if (++fake_value_iter == fake_values.end())
