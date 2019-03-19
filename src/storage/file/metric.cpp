@@ -298,10 +298,26 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     switch (scope.begin)
     {
     case Scope::closed:
-        index_begin = (offset_begin - Duration(1)) / interval + 1;
+        // Unfortunately division with negative numbers does *not* round down
+        // so we have to make extra cases for pre-epoch
+        if (offset_begin.count() <= 0)
+        {
+            index_begin = 0;
+        }
+        else
+        {
+            index_begin = (offset_begin - Duration(1)) / interval + 1;
+        }
         break;
     case Scope::open:
-        index_begin = offset_begin / interval + 1;
+        if (offset_begin.count() < 0)
+        {
+            index_begin = 0;
+        }
+        else
+        {
+            index_begin = offset_begin / interval + 1;
+        }
         break;
     case Scope::extended:
         index_begin = offset_begin / interval;
@@ -320,7 +336,14 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
         index_end = (offset_end - Duration(1)) / interval;
         break;
     case Scope::extended:
-        index_end = (offset_end - Duration(1)) / interval + 1;
+        if (offset_end.count() <= 0)
+        {
+            index_end = 0;
+        }
+        else
+        {
+            index_end = (offset_end - Duration(1)) / interval + 1;
+        }
         break;
     case Scope::infinity:
         index_end = sz - 1;
