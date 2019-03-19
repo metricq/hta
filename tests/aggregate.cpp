@@ -170,7 +170,7 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 CHECK(result.count == 110);
                 CHECK(result.minimum == -37);
                 CHECK(result.maximum == 45);
-                CHECK(result.sum == 1973);
+                CHECK(result.sum == 1983.);
                 auto integral = (-36 * 10) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
                                 (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
                                 (35 * 6);
@@ -185,9 +185,9 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
             {
                 auto result = metric.aggregate(tp(20s), tp(30s));
                 CHECK(result.count == 1);
-                CHECK(result.minimum == -36);
-                CHECK(result.maximum == -30);
-                CHECK(result.mean_sum() == -36);
+                CHECK(result.minimum == -36.);
+                CHECK(result.maximum == -30.);
+                CHECK(result.mean_sum() == -36.);
                 CHECK(result.mean_integral() == (-36 - 9 * 30) / 10.0);
                 CHECK(result.active_time == 10s);
             }
@@ -198,10 +198,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 {
                     auto result = metric.aggregate(tp(11s), tp(21s));
                     CHECK(result.count == 1);
-                    CHECK(result.minimum == -36);
-                    CHECK(result.maximum == -36);
-                    CHECK(result.mean_sum() == -36);
-                    CHECK(result.mean_integral() == -36 / 10.0);
+                    CHECK(result.minimum == -36.);
+                    CHECK(result.maximum == -36.);
+                    CHECK(result.mean_sum() == -36.);
+                    CHECK(result.mean_integral() == -36.);
                     CHECK(result.active_time == 10s);
                 }
 
@@ -210,10 +210,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                     auto result = metric.aggregate(tp(21s), tp(42s));
                     CHECK(result.count == 1); // the right guy isn't technically inside the interval
                                               // as a point
-                    CHECK(result.sum == -36);
-                    CHECK(result.minimum == -36);
-                    CHECK(result.maximum == -30);
-                    CHECK(result.mean_integral() == -30);
+                    CHECK(result.sum == -30.);
+                    CHECK(result.minimum == -30.);
+                    CHECK(result.maximum == -30.);
+                    CHECK(result.mean_integral() == -30.);
                     CHECK(result.active_time == 21s);
                 }
             }
