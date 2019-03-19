@@ -6,6 +6,11 @@ add_executable(hta.test_aggregation aggregation.cpp)
 add_test(hta.test_aggregation hta.test_aggregation)
 target_link_libraries(hta.test_aggregation PRIVATE hta::hta catch::catch json::json)
 
+add_executable(hta.test_aggregate aggregate.cpp)
+add_test(hta.test_aggregate hta.test_aggregate)
+target_link_libraries(hta.test_aggregate PRIVATE hta::hta catch::catch json::json)
+
+
 add_executable(hta.test_restore restore.cpp)
 add_test(hta.test_restore hta.test_restore)
 target_link_libraries(hta.test_restore PRIVATE hta::hta catch::catch json::json)

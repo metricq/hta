@@ -56,6 +56,8 @@ constexpr hta::TimeValue sample(T duration, double value)
     return { tp(duration), value };
 }
 
+// This test checks the retrieve() methods of a hta::Metric
+
 TEST_CASE("HTA file can basically be written and read.", "[hta]")
 {
     // Unfortunately there are no portable unique temporary directory creation mechanisms
@@ -112,38 +114,6 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     {
         hta::Directory dir(config_path);
         auto& metric = dir["foo"];
-
-        {
-            auto result = metric.aggregate(tp(20s), tp(30s));
-            CHECK(result.count == 1);
-            CHECK(result.minimum == -36);
-            CHECK(result.maximum == -30);
-            CHECK(result.mean_sum() == -36);
-            CHECK(result.mean_integral() == (-36 - 9 * 30) / 10.0);
-            CHECK(result.active_time == 10s);
-        }
-        {
-            auto result = metric.aggregate(tp(21s), tp(42s));
-            CHECK(result.count == 1); // the right guy isn't technically inside the interval as a point
-            CHECK(result.sum == -36);
-            CHECK(result.minimum == -36);
-            CHECK(result.maximum == -30);
-            CHECK(result.mean_integral() == -30);
-            CHECK(result.active_time == 21s);
-        }
-        {
-            auto result = metric.aggregate(tp(20s), tp(220s));
-            CHECK(result.count == 108);
-            CHECK(result.minimum == -36);
-            CHECK(result.maximum == 45);
-            CHECK(result.sum == 1985);
-            CHECK(result.mean_sum() == 1985 / 108.);
-            auto integral = (-36 * 1) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) + (-10 * 13) +
-                            (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) + (35 * 1);
-            CHECK(result.active_time == 200s);
-            CHECK(result.integral == integral * hta::duration_cast(1s).count());
-
-        }
 
         // TODO check raw values
         {

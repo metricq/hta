@@ -224,7 +224,7 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
     }
 
     assert(index_begin >= 0);
-    assert(index_begin < sz);
+    assert(index_begin <= sz);
     assert(index_end >= 0);
     assert(index_end <= sz);
     assert(index_begin <= index_end);
