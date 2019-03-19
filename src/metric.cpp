@@ -155,6 +155,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         }
         return a;
     }
+    assert(begin <= next_begin);
+    if (begin < next_begin)
     {
         // Add left raw side
         auto left_raw =
@@ -180,6 +182,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
             previous_time = tv.time;
         }
     }
+    assert(next_end <= end);
+    if (next_end < end)
     {
         // Add right raw side
         auto right_raw =
