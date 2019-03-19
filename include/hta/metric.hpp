@@ -141,6 +141,7 @@ private: // common
     void check_write() const;
 
 public: // read
+    // infinity scopes are not supported here
     std::vector<Row> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
     std::vector<Row> retrieve(TimePoint begin, TimePoint end, Duration interval_max,

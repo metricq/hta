@@ -112,7 +112,7 @@ std::vector<Row> Metric::retrieve_raw_row(TimePoint begin, TimePoint end, Interv
 std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, IntervalScope scope)
 {
     check_read();
-    if (begin > end)
+    if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
     {
         throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
                         end);
@@ -273,7 +273,7 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
                                   IntervalScope scope)
 {
     check_read();
-    if (begin > end)
+    if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
     {
         throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
                         end);
