@@ -130,7 +130,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     {
         // No need to go to any intervals or do any splits, just one raw chunk
         auto raw = storage_metric_->get(begin, next_begin,
-                                        IntervalScope{ Scope::closed, Scope::extended });
+                                        IntervalScope{ Scope::open, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : raw)
@@ -148,7 +148,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     {
         // Add left raw side
         auto left_raw = storage_metric_->get(begin, next_begin,
-                                             IntervalScope{ Scope::closed, Scope::extended });
+                                             IntervalScope{ Scope::open, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : left_raw)
@@ -173,7 +173,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     {
         // Add right raw side
         auto right_raw =
-            storage_metric_->get(next_end, end, IntervalScope{ Scope::closed, Scope::extended });
+            storage_metric_->get(next_end, end, IntervalScope{ Scope::open, Scope::extended });
         auto previous_time = next_end;
         for (auto tv : right_raw)
         {
@@ -204,7 +204,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         {
             // Use contiguous block and end
             auto rows = storage_metric_->get(begin, interval_begin(end, interval), interval,
-                                             IntervalScope{ Scope::closed, Scope::open });
+                                             IntervalScope{ Scope::open, Scope::closed });
             for (const auto& ta : rows)
             {
                 a += ta.aggregate;
@@ -214,7 +214,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
 
         // add left aggregates
         auto rows_left = storage_metric_->get(begin, next_begin, interval,
-                                              IntervalScope{ Scope::closed, Scope::open });
+                                              IntervalScope{ Scope::open, Scope::closed });
         for (const auto& ta : rows_left)
         {
             a += ta.aggregate;
