@@ -114,39 +114,106 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
         hta::Directory dir(config_path);
         auto& metric = dir["foo"];
 
+        SECTION("larger intervals works")
         {
-            auto result = metric.aggregate(tp(20s), tp(30s));
-            CHECK(result.count == 1);
-            CHECK(result.minimum == -36);
-            CHECK(result.maximum == -30);
-            CHECK(result.mean_sum() == -36);
-            CHECK(result.mean_integral() == (-36 - 9 * 30) / 10.0);
-            CHECK(result.active_time == 10s);
-        }
-        {
-            auto result = metric.aggregate(tp(21s), tp(42s));
-            CHECK(result.count == 1); // the right guy isn't technically inside the interval as a
-                                      // point
-            CHECK(result.sum == -36);
-            CHECK(result.minimum == -36);
-            CHECK(result.maximum == -30);
-            CHECK(result.mean_integral() == -30);
-            CHECK(result.active_time == 21s);
-        }
-        {
-            auto result = metric.aggregate(tp(20s), tp(220s));
-            CHECK(result.count == 108);
-            CHECK(result.minimum == -36);
-            CHECK(result.maximum == 45);
-            CHECK(result.sum == 1985);
-            CHECK(result.mean_sum() == 1985 / 108.);
-            auto integral = (-36 * 1) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) + (-10 * 13) +
-                            (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) + (35 * 1);
-            CHECK(result.active_time == 200s);
-            CHECK(result.integral == integral * hta::duration_cast(1s).count());
+            SECTION("when the interval is between the first and the last raw value")
+            {
+                auto result = metric.aggregate(tp(20s), tp(220s));
+                CHECK(result.count == 108);
+                CHECK(result.minimum == -36);
+                CHECK(result.maximum == 45);
+                CHECK(result.sum == 1985);
+                CHECK(result.mean_sum() == 1985 / 108.);
+                auto integral = (-36 * 1) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
+                                (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
+                                (35 * 1);
+                CHECK(result.active_time == 200s);
+                CHECK(result.integral == integral * hta::duration_cast(1s).count());
+            }
+
+            SECTION("when the interval is exactly from the first to the last timestamp")
+            {
+                auto result = metric.aggregate(tp(11s), tp(225s));
+                CHECK(result.count == 109);
+                CHECK(result.minimum == -36);
+                CHECK(result.maximum == 45);
+                CHECK(result.sum == 2010);
+                CHECK(result.mean_sum() == 2010 / 109.);
+                auto integral = (-36 * 10) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
+                                (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
+                                (35 * 6);
+                CHECK(result.active_time == 214s);
+                CHECK(result.integral == integral * hta::duration_cast(1s).count());
+            }
+
+            SECTION("when the interval starts before the first timestamp and ends after the last "
+                    "timestamp")
+            {
+                auto result = metric.aggregate(tp(1s), tp(230s));
+                CHECK(result.count == 110);
+                CHECK(result.minimum == -37);
+                CHECK(result.maximum == 45);
+                CHECK(result.sum == 1973);
+                auto integral = (-36 * 10) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
+                                (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
+                                (35 * 6);
+                CHECK(result.active_time == 214s);
+                CHECK(result.integral == integral * hta::duration_cast(1s).count());
+            }
         }
 
-        SECTION("Out-of-bounds are handled correctly")
+        SECTION("Tiny intervals are handled correctly")
+        {
+            SECTION("when containing one raw value")
+            {
+                auto result = metric.aggregate(tp(20s), tp(30s));
+                CHECK(result.count == 1);
+                CHECK(result.minimum == -36);
+                CHECK(result.maximum == -30);
+                CHECK(result.mean_sum() == -36);
+                CHECK(result.mean_integral() == (-36 - 9 * 30) / 10.0);
+                CHECK(result.active_time == 10s);
+            }
+
+            SECTION("when the interval is excatly from one raw values to the next raw value")
+            {
+                SECTION("Case A")
+                {
+                    auto result = metric.aggregate(tp(11s), tp(21s));
+                    CHECK(result.count == 1);
+                    CHECK(result.minimum == -36);
+                    CHECK(result.maximum == -36);
+                    CHECK(result.mean_sum() == -36);
+                    CHECK(result.mean_integral() == -36 / 10.0);
+                    CHECK(result.active_time == 10s);
+                }
+
+                SECTION("Case B")
+                {
+                    auto result = metric.aggregate(tp(21s), tp(42s));
+                    CHECK(result.count == 1); // the right guy isn't technically inside the interval
+                                              // as a point
+                    CHECK(result.sum == -36);
+                    CHECK(result.minimum == -36);
+                    CHECK(result.maximum == -30);
+                    CHECK(result.mean_integral() == -30);
+                    CHECK(result.active_time == 21s);
+                }
+            }
+
+            SECTION("when the interval is stricly between two raw values")
+            {
+                auto result = metric.aggregate(tp(12s), tp(20s));
+                CHECK(result.count == 0);
+                CHECK(result.minimum == -36);
+                CHECK(result.maximum == -36);
+                CHECK(result.mean_sum() == -36);
+                CHECK(result.mean_integral() == -36 / 8.0);
+                CHECK(result.active_time == 8s);
+            }
+        }
+
+        SECTION("Edge-cases are handled properly")
         {
             SECTION("when it begins after the last timestamp")
             {
