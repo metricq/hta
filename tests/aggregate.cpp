@@ -154,8 +154,8 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 CHECK(result.count == 109);
                 CHECK(result.minimum == -36);
                 CHECK(result.maximum == 45);
-                CHECK(result.sum == 2010);
-                CHECK(result.mean_sum() == 2010 / 109.);
+                CHECK(result.sum == 2020.);
+                CHECK(result.mean_sum() == 2020. / 109.);
                 auto integral = (-36 * 10) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
                                 (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
                                 (35 * 6);

@@ -128,6 +128,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
                         end);
     }
+    // We must cap the end or we use intervals that are not yet completely written
+    end = std::min(end, range().second);
 
     auto interval = interval_min_;
 
