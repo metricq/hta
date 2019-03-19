@@ -166,7 +166,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         for (auto tv : left_raw)
         {
             assert(previous_time <= tv.time);
-            if (tv.time >= next_begin)
+            if (tv.time > next_begin)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = next_begin - previous_time;
@@ -191,7 +191,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         auto previous_time = next_end;
         for (auto tv : right_raw)
         {
-            if (tv.time >= end)
+            if (tv.time > end)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = end - previous_time;
