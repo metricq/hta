@@ -114,7 +114,24 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
         hta::Directory dir(config_path);
         auto& metric = dir["foo"];
 
-        SECTION("larger intervals works")
+        SECTION("Invalid inputs")
+        {
+            SECTION("when begin is largen than end")
+            {
+                REQUIRE_THROWS(metric.aggregate(tp(10s), tp(1s)));
+            }
+
+            SECTION("when begin equals end")
+            {
+                REQUIRE_THROWS(metric.aggregate(tp(1s), tp(1s)));
+                REQUIRE_THROWS(metric.aggregate(tp(11s), tp(11s)));
+                REQUIRE_THROWS(metric.aggregate(tp(85s), tp(85s)));
+                REQUIRE_THROWS(metric.aggregate(tp(225s), tp(225s)));
+                REQUIRE_THROWS(metric.aggregate(tp(250s), tp(250s)));
+            }
+        }
+
+        SECTION("larger intervals are handled correctly")
         {
             SECTION("when the interval is between the first and the last raw value")
             {
@@ -210,6 +227,50 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 CHECK(result.mean_sum() == -36);
                 CHECK(result.mean_integral() == -36 / 8.0);
                 CHECK(result.active_time == 8s);
+            }
+
+            SECTION("when the interval is the first row")
+            {
+                auto [epoch, _] = metric.range();
+
+                CHECK(epoch == tp(11s));
+
+                auto begin = interval_begin(epoch, 10s);
+                auto end = interval_end(epoch, 10s);
+
+                CHECK(begin == tp(10s));
+                CHECK(end == tp(20s));
+
+                auto result = metric.aggregate(begin, end);
+
+                CHECK(result.active_time == 9s);
+                CHECK(result.count == 1);
+                CHECK(result.sum == -37);
+                CHECK(result.minimum == -37);
+                CHECK(result.maximum == -36);
+                CHECK(result.integral == (-36 * 9) * hta::duration_cast(1s).count());
+            }
+
+            SECTION("when the interval is the row before the first row")
+            {
+                auto [epoch, _] = metric.range();
+
+                CHECK(epoch == tp(11s));
+
+                auto begin = interval_begin(epoch, 10s) - 10s;
+                auto end = interval_end(epoch, 10s) - 10s;
+
+                CHECK(begin == tp(0s));
+                CHECK(end == tp(10s));
+
+                auto result = metric.aggregate(begin, end);
+
+                CHECK(result.active_time == 0s);
+                CHECK(result.count == 0);
+                CHECK(result.sum == 0);
+                CHECK(result.minimum == std::numeric_limits<hta::Value>::infinity());
+                CHECK(result.maximum == -std::numeric_limits<hta::Value>::infinity());
+                CHECK(result.integral == 0);
             }
         }
 

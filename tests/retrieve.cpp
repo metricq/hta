@@ -115,6 +115,14 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
         hta::Directory dir(config_path);
         auto& metric = dir["foo"];
 
+        SECTION("when begin is largen than end")
+        {
+            REQUIRE_THROWS(metric.retrieve(tp(10s), tp(1s)));
+            REQUIRE_THROWS(metric.retrieve(tp(100s), tp(10s)));
+            REQUIRE_THROWS(metric.retrieve(tp(10s), tp(1s), 1));
+            REQUIRE_THROWS(metric.retrieve(tp(100s), tp(10s), 1));
+        }
+
         // TODO check raw values
         {
             auto result = metric.retrieve(tp(0s), tp(300s), 31);
