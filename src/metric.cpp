@@ -112,12 +112,22 @@ std::vector<Row> Metric::retrieve_raw_row(TimePoint begin, TimePoint end, Interv
 std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, IntervalScope scope)
 {
     check_read();
+    if (begin > end)
+    {
+        throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
+                        end);
+    }
     return storage_metric_->get(begin, end, scope);
 }
 
 Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
 {
     check_read();
+    if (begin > end)
+    {
+        throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
+                        end);
+    }
 
     auto interval = interval_min_;
 
@@ -129,8 +139,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     if (next_begin >= next_end)
     {
         // No need to go to any intervals or do any splits, just one raw chunk
-        auto raw = storage_metric_->get(begin, next_begin,
-                                        IntervalScope{ Scope::open, Scope::extended });
+        auto raw =
+            storage_metric_->get(begin, next_begin, IntervalScope{ Scope::open, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : raw)
@@ -147,8 +157,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     }
     {
         // Add left raw side
-        auto left_raw = storage_metric_->get(begin, next_begin,
-                                             IntervalScope{ Scope::open, Scope::extended });
+        auto left_raw =
+            storage_metric_->get(begin, next_begin, IntervalScope{ Scope::open, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : left_raw)
@@ -249,7 +259,11 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_s
                                   IntervalScope scope)
 {
     check_read();
-    assert(begin <= end);
+    if (begin > end)
+    {
+        throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
+                        end);
+    }
     auto duration = end - begin;
     auto interval_max_length = duration / min_samples;
     return retrieve(begin, end, interval_max_length, scope);
@@ -259,6 +273,11 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
                                   IntervalScope scope)
 {
     check_read();
+    if (begin > end)
+    {
+        throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
+                        end);
+    }
     if (interval_upper_limit < interval_min_)
     {
         return retrieve_raw_row(begin, end, scope);
