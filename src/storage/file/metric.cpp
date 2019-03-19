@@ -339,7 +339,12 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     assert(index_begin < sz);
     assert(index_end >= 0);
     assert(index_end <= sz);
-    assert(index_begin <= index_end);
+
+    // It is possible that this happens in some strange configurations of scopes
+    if (index_begin > index_end)
+    {
+        return {};
+    }
 
     size_t count = index_end - index_begin + 1;
 
