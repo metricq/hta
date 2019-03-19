@@ -218,7 +218,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         {
             // Use contiguous block and end
             auto rows = storage_metric_->get(begin, interval_begin(end, interval), interval,
-                                             IntervalScope{ Scope::open, Scope::closed });
+                                             IntervalScope{ Scope::closed, Scope::open });
             for (const auto& ta : rows)
             {
                 a += ta.aggregate;
@@ -228,7 +228,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
 
         // add left aggregates
         auto rows_left = storage_metric_->get(begin, next_begin, interval,
-                                              IntervalScope{ Scope::open, Scope::closed });
+                                              IntervalScope{ Scope::closed, Scope::open });
         for (const auto& ta : rows_left)
         {
             a += ta.aggregate;
