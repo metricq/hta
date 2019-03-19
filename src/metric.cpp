@@ -123,7 +123,7 @@ std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, Interval
 Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
 {
     check_read();
-    if (begin > end)
+    if (begin >= end)
     {
         throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
                         end);
