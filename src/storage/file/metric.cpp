@@ -34,6 +34,14 @@
 
 #include <algorithm>
 
+// used for time-guided binary search assuming equidistant timestamps
+// best-case speedup    ld(1/c)
+// worst-case slowdown  1 / ld (1/(1-c))
+// no clamping would lead to
+// best-case 2-lookups
+// worst case linear search - stack overflow
+static constexpr double search_clamping = 0.01;
+
 namespace hta::storage::file
 {
 Meta Metric::meta() const
@@ -100,11 +108,11 @@ int64_t Metric::find_index_before_or_on_binary(TimePoint t, int64_t left, int64_
         assert(t_left < t_right1);
 
         auto span = t_right1 - t_left;
-        // We clamp the range of the pivot to avoid linear search / stack overflow in degenerate cases
+        // We clamp the range of the pivot to avoid linear search / stack overflow in bad cases
         auto fraction = std::clamp<double>(static_cast<double>((t - t_left).count()) / span.count(),
-                                           0.05, 0.95);
-        pivot = std::clamp<int64_t>(left * (1 - fraction) + (right - 1) * fraction, left + 1,
-                                    right - 1);
+                                           search_clamping, 1 - search_clamping);
+        // Clamp again to make sure we make some progress
+        pivot = std::clamp<int64_t>(left + (left - (right - 1)) * fraction, left + 1, right - 1);
     }
     assert(pivot < sz);
 
@@ -157,11 +165,11 @@ int64_t Metric::find_index_on_or_after_binary(TimePoint t, int64_t left, int64_t
         assert(t_left < t_right1);
 
         auto span = t_right1 - t_left;
-        // We clamp the range of the pivot to avoid linear search / stack overflow in degenerate cases
+        // We clamp the range of the pivot to avoid linear search / stack overflow in bad cases
         auto fraction = std::clamp<double>(static_cast<double>((t - t_left).count()) / span.count(),
-                                           0.05, 0.95);
-        pivot = std::clamp<int64_t>(left * (1 - fraction) + (right - 1) * fraction, left + 1,
-                                    right - 1);
+                                           search_clamping, 1 - search_clamping);
+        // Clamp again to make sure we make some progress
+        pivot = std::clamp<int64_t>(left + (left - (right - 1)) * fraction, left + 1, right - 1);
     }
     assert(pivot < sz);
 
