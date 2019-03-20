@@ -54,7 +54,7 @@ json read_json_from_file(const std::filesystem::path& path)
 
 int main(int argc, char* argv[])
 {
-    assert(argc == 2);
+    assert(argc == 3);
     std::string config_file = argv[1];
     std::string metric_name = argv[2];
 
