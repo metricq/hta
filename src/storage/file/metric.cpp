@@ -112,7 +112,7 @@ int64_t Metric::find_index_before_or_on_binary(TimePoint t, int64_t left, int64_
         auto fraction = std::clamp<double>(static_cast<double>((t - t_left).count()) / span.count(),
                                            search_clamping, 1 - search_clamping);
         // Clamp again to make sure we make some progress
-        pivot = std::clamp<int64_t>(left + (left - (right - 1)) * fraction, left + 1, right - 1);
+        pivot = std::clamp<int64_t>(left + (right - 1 - left) * fraction, left + 1, right - 1);
     }
     assert(pivot < sz);
 
@@ -169,7 +169,7 @@ int64_t Metric::find_index_on_or_after_binary(TimePoint t, int64_t left, int64_t
         auto fraction = std::clamp<double>(static_cast<double>((t - t_left).count()) / span.count(),
                                            search_clamping, 1 - search_clamping);
         // Clamp again to make sure we make some progress
-        pivot = std::clamp<int64_t>(left + (left - (right - 1)) * fraction, left + 1, right - 1);
+        pivot = std::clamp<int64_t>(left + (right - 1 - left) * fraction, left + 1, right - 1);
     }
     assert(pivot < sz);
 
