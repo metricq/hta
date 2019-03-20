@@ -101,11 +101,55 @@ int64_t Metric::find_index_before_or_on_binary(TimePoint t, int64_t left, int64_
 
 int64_t Metric::find_index_before_or_on(TimePoint t, int64_t sz)
 {
-    if (get_raw_ts(0) > t)
+    auto [begin, end] = range();
+    if (begin > t)
     {
         return -1;
     }
-    return find_index_before_or_on_binary(t, 0, sz, sz);
+    if (end <= t)
+    {
+        return sz - 1;
+    }
+
+    int64_t index = 0;
+    auto m = meta();
+    Duration interval = m.interval_min;
+
+    while (true)
+    {
+        auto interval_next = interval * m.interval_factor;
+        auto interval_begin_current = interval_begin(t, interval);
+        auto interval_begin_next = interval_begin(t, interval_next);
+
+        if (interval_next > m.interval_max)
+        {
+            interval_begin_next = epoch(interval);
+        }
+
+        if (interval_begin_current != interval_begin_next)
+        {
+            auto level = this->get(interval_begin_next, interval_begin_current, interval,
+                                   { Scope::closed, Scope::open });
+            for (const auto& chunk : level)
+            {
+                index += chunk.aggregate.count;
+            }
+        }
+
+        if (interval_begin_next <= epoch(interval))
+        {
+            break;
+        }
+        interval = interval_next;
+    }
+
+    // >= index points are now *before* t
+    for (; index + 1 < sz && get_raw_ts(index + 1) <= t; index++)
+        ;
+
+    assert(get_raw_ts(index) <= t);
+    assert(index == int64_t(sz - 1) || get_raw_ts(index + 1) > t);
+    return index;
 }
 
 int64_t Metric::find_index_on_or_after_binary(TimePoint t, int64_t left, int64_t right, int64_t sz)
@@ -139,11 +183,55 @@ int64_t Metric::find_index_on_or_after_binary(TimePoint t, int64_t left, int64_t
 
 int64_t Metric::find_index_on_or_after(TimePoint t, int64_t sz)
 {
-    if (get_raw_ts(0) >= t)
+    auto [begin, end] = range();
+    if (begin >= t)
     {
         return 0;
     }
-    return find_index_on_or_after_binary(t, 0, sz, sz);
+    if (end < t)
+    {
+        return sz;
+    }
+
+    int64_t index = 0;
+    auto m = meta();
+    Duration interval = m.interval_min;
+
+    while (true)
+    {
+        auto interval_next = interval * m.interval_factor;
+        auto interval_begin_current = interval_begin(t, interval);
+        auto interval_begin_next = interval_begin(t, interval_next);
+
+        if (interval_next > m.interval_max)
+        {
+            interval_begin_next = epoch(interval);
+        }
+
+        if (interval_begin_current != interval_begin_next)
+        {
+            auto level = this->get(interval_begin_next, interval_begin_current, interval,
+                                   { Scope::closed, Scope::open });
+            for (const auto& chunk : level)
+            {
+                index += chunk.aggregate.count;
+            }
+        }
+
+        if (interval_begin_next <= epoch(interval))
+        {
+            break;
+        }
+        interval = interval_next;
+    }
+
+    // >= index points are now *before* t
+    for (; index < sz && get_raw_ts(index) < t; index++)
+        ;
+
+    assert(index == 0 || get_raw_ts(index - 1) < t);
+    assert(get_raw_ts(index) >= t);
+    return index;
 }
 
 TimePoint Metric::get_raw_ts(uint64_t index)
