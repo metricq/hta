@@ -79,7 +79,8 @@ int main(int argc, char* argv[])
     file.seekg(0);
     file.read(reinterpret_cast<char*>(fake_values.data()), size_bytes);
 
-    pcg64 random;
+    int seed = config.at("seed");
+    pcg64 random(seed);
     std::uniform_int_distribution<size_t> distribution(0, fake_values.size() - 1);
 
     hta::Directory out_directory(config);
