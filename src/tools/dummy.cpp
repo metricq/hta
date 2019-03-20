@@ -54,11 +54,10 @@ json read_json_from_file(const std::filesystem::path& path)
 
 int main(int argc, char* argv[])
 {
-    std::string config_file = "config.json";
-    if (argc > 1)
-    {
-        config_file = argv[1];
-    }
+    assert(argc == 2);
+    std::string config_file = argv[1];
+    std::string metric_name = argv[2];
+
     auto config = read_json_from_file(std::filesystem::path(config_file));
 
     std::string metric_prefix = "bench.s0.";
@@ -90,17 +89,14 @@ int main(int argc, char* argv[])
     auto duration = std::chrono::hours(24 * 365);
     auto interval = std::chrono::milliseconds(1);
 
-    for (int i = 0; i < 6; i++)
+    auto fake_value_iter = fake_values.begin() + distribution(random);
+    auto& metric = out_directory[metric_name];
+    for (std::chrono::nanoseconds time_off {0}; time_off < duration; time_off += interval)
     {
-        auto fake_value_iter = fake_values.begin() + distribution(random);
-        auto& metric = out_directory[metric_prefix + std::to_string(i)];
-        for (std::chrono::nanoseconds time_off {0}; time_off < duration; time_off += interval)
+        metric.insert(hta::TimeValue(time_base + time_off, *fake_value_iter));
+        if (++fake_value_iter == fake_values.end())
         {
-            metric.insert(hta::TimeValue(time_base + time_off, *fake_value_iter));
-            if (++fake_value_iter == fake_values.end())
-            {
-                fake_value_iter = fake_values.begin();
-            }
+            fake_value_iter = fake_values.begin();
         }
     }
 }
