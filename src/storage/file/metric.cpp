@@ -330,10 +330,24 @@ std::vector<TimeAggregate> Metric::get(TimePoint begin, TimePoint end, Duration 
     switch (scope.end)
     {
     case Scope::closed:
-        index_end = offset_end / interval;
+        if (offset_end.count() < 0)
+        {
+            index_end = -1;
+        }
+        else
+        {
+            index_end = offset_end / interval;
+        }
         break;
     case Scope::open:
-        index_end = (offset_end - Duration(1)) / interval;
+        if (offset_end.count() <= 0)
+        {
+            index_end = -1;
+        }
+        else
+        {
+            index_end = (offset_end - Duration(1)) / interval;
+        }
         break;
     case Scope::extended:
         if (offset_end.count() <= 0)
