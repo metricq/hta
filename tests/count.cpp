@@ -116,7 +116,7 @@ TEST_CASE("Metric count interface works", "[hta]")
 
         SECTION("Invalid inputs")
         {
-            SECTION("when begin is largen than end")
+            SECTION("when begin is larger than end")
             {
                 REQUIRE_THROWS(metric.count(tp(10s), tp(1s)));
             }
