@@ -224,7 +224,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     while (true)
     {
         auto next_interval = interval * interval_factor_;
-        next_begin = interval_end(begin - Duration(1), next_interval);
+        next_begin = interval_end(begin, next_interval);
         next_end = interval_begin(end, next_interval);
 
         if (next_interval > interval_max_ ||
