@@ -115,7 +115,7 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
         hta::Directory dir(config_path);
         auto& metric = dir["foo"];
 
-        SECTION("when begin is largen than end")
+        SECTION("when begin is larger than end")
         {
             REQUIRE_THROWS(metric.retrieve(tp(10s), tp(1s)));
             REQUIRE_THROWS(metric.retrieve(tp(100s), tp(10s)));
@@ -209,6 +209,282 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
             REQUIRE(result.size() == 1);
 
             CHECK(result[0].time == tp(10s));
+        }
+
+        SECTION("when the interval is exactly from one raw value to another raw value")
+        {
+            auto begin = tp(42s);
+            auto end = tp(67s);
+
+            SECTION("with scope: {open - open}")
+            {
+                auto result = metric.retrieve(begin, end, { hta::Scope::open, hta::Scope::open });
+
+                CHECK(result.size() == 2);
+
+                CHECK(result[0].time == tp(48s));
+                CHECK(result[0].value == -20.);
+                CHECK(result[1].time == tp(53s));
+                CHECK(result[1].value == -10.);
+            }
+
+            SECTION("with scope: {open - closed}")
+            {
+                auto result = metric.retrieve(begin, end, { hta::Scope::open, hta::Scope::closed });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(48s));
+                CHECK(result[0].value == -20.);
+                CHECK(result[1].time == tp(53s));
+                CHECK(result[1].value == -10.);
+                CHECK(result[2].time == tp(67s));
+                CHECK(result[2].value == 0.);
+            }
+
+            SECTION("with scope: {open - extended}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::open, hta::Scope::extended });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(48s));
+                CHECK(result[0].value == -20.);
+                CHECK(result[1].time == tp(53s));
+                CHECK(result[1].value == -10.);
+                CHECK(result[2].time == tp(67s));
+                CHECK(result[2].value == 0.);
+            }
+
+            SECTION("with scope: {closed - open}")
+            {
+                auto result = metric.retrieve(begin, end, { hta::Scope::closed, hta::Scope::open });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+            }
+
+            SECTION("with scope: {closed - closed}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::closed, hta::Scope::closed });
+
+                CHECK(result.size() == 4);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+                CHECK(result[3].time == tp(67s));
+                CHECK(result[3].value == 0.);
+            }
+
+            SECTION("with scope: {closed - extended}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::closed, hta::Scope::extended });
+
+                CHECK(result.size() == 4);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+                CHECK(result[3].time == tp(67s));
+                CHECK(result[3].value == 0.);
+            }
+
+            SECTION("with scope: {extended - open}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::extended, hta::Scope::open });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+            }
+
+            SECTION("with scope: {extended - closed}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::extended, hta::Scope::closed });
+
+                CHECK(result.size() == 4);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+                CHECK(result[3].time == tp(67s));
+                CHECK(result[3].value == 0.);
+            }
+
+            SECTION("with scope: {extended - extended}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::extended, hta::Scope::extended });
+
+                CHECK(result.size() == 4);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+                CHECK(result[3].time == tp(67s));
+                CHECK(result[3].value == 0.);
+            }
+        }
+
+        SECTION("when the interval is exactly one interval")
+        {
+            auto begin = tp(40s);
+            auto end = tp(50s);
+
+            SECTION("with scope: {open - open}")
+            {
+                auto result = metric.retrieve(begin, end, { hta::Scope::open, hta::Scope::open });
+
+                CHECK(result.size() == 2);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+            }
+
+            SECTION("with scope: {open - closed}")
+            {
+                auto result = metric.retrieve(begin, end, { hta::Scope::open, hta::Scope::closed });
+
+                CHECK(result.size() == 2);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+            }
+
+            SECTION("with scope: {open - extended}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::open, hta::Scope::extended });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+            }
+
+            SECTION("with scope: {closed - open}")
+            {
+                auto result = metric.retrieve(begin, end, { hta::Scope::closed, hta::Scope::open });
+
+                CHECK(result.size() == 2);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+            }
+
+            SECTION("with scope: {closed - closed}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::closed, hta::Scope::closed });
+
+                CHECK(result.size() == 2);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+            }
+
+            SECTION("with scope: {closed - extended}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::closed, hta::Scope::extended });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(42s));
+                CHECK(result[0].value == -30.);
+                CHECK(result[1].time == tp(48s));
+                CHECK(result[1].value == -20.);
+                CHECK(result[2].time == tp(53s));
+                CHECK(result[2].value == -10.);
+            }
+
+            SECTION("with scope: {extended - open}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::extended, hta::Scope::open });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(21s));
+                CHECK(result[0].value == -36.);
+                CHECK(result[1].time == tp(42s));
+                CHECK(result[1].value == -30.);
+                CHECK(result[2].time == tp(48s));
+                CHECK(result[2].value == -20.);
+            }
+
+            SECTION("with scope: {extended - closed}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::extended, hta::Scope::closed });
+
+                CHECK(result.size() == 3);
+
+                CHECK(result[0].time == tp(21s));
+                CHECK(result[0].value == -36.);
+                CHECK(result[1].time == tp(42s));
+                CHECK(result[1].value == -30.);
+                CHECK(result[2].time == tp(48s));
+                CHECK(result[2].value == -20.);
+            }
+
+            SECTION("with scope: {extended - extended}")
+            {
+                auto result =
+                    metric.retrieve(begin, end, { hta::Scope::extended, hta::Scope::extended });
+
+                CHECK(result.size() == 4);
+
+                CHECK(result[0].time == tp(21s));
+                CHECK(result[0].value == -36.);
+                CHECK(result[1].time == tp(42s));
+                CHECK(result[1].value == -30.);
+                CHECK(result[2].time == tp(48s));
+                CHECK(result[2].value == -20.);
+                CHECK(result[3].time == tp(53s));
+                CHECK(result[3].value == -10.);
+            }
         }
     }
 }
