@@ -130,6 +130,13 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     }
     // We must cap the end or we use intervals that are not yet completely written
     auto r = range();
+
+    if (end <= r.first)
+    {
+        // Really, nothing to see here if the first point isn't even in the interval
+        return {};
+    }
+
     // TODO We could further optimize requests from (before) the beginning of time by using the
     // incomplete intervals of upper levels rather than piecing together raw/low ones
     begin = std::clamp(begin, r.first, r.second);
@@ -138,7 +145,6 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     auto bounded_end = std::clamp(end, r.first, r.second);
 
     auto interval = interval_min_;
-
     auto next_begin = interval_end(begin - Duration(1), interval);
     auto next_end = interval_begin(bounded_end, interval);
 
@@ -147,8 +153,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     if (next_begin >= next_end)
     {
         // No need to go to any intervals or do any splits, just one raw chunk
-        auto raw =
-            storage_metric_->get(begin, bounded_end, IntervalScope{ Scope::closed, Scope::extended });
+        auto raw = storage_metric_->get(begin, bounded_end,
+                                        IntervalScope{ Scope::closed, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : raw)
@@ -203,8 +209,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     if (next_end < bounded_end)
     {
         // Add right raw side
-        auto right_raw =
-            storage_metric_->get(next_end, bounded_end, IntervalScope{ Scope::closed, Scope::extended });
+        auto right_raw = storage_metric_->get(next_end, bounded_end,
+                                              IntervalScope{ Scope::closed, Scope::extended });
         auto previous_time = next_end;
         for (auto tv : right_raw)
         {
@@ -253,8 +259,9 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         }
 
         // add right aggregates
-        auto rows_right = storage_metric_->get(next_end, interval_begin(bounded_end, interval), interval,
-                                               IntervalScope{ Scope::closed, Scope::open });
+        auto rows_right =
+            storage_metric_->get(next_end, interval_begin(bounded_end, interval), interval,
+                                 IntervalScope{ Scope::closed, Scope::open });
         for (const auto& ta : rows_right)
         {
             a += ta.aggregate;
