@@ -131,7 +131,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     // We must cap the end or we use intervals that are not yet completely written
     auto r = range();
 
-    if (end <= r.first)
+    if (end <= r.first || begin > r.second)
     {
         // Really, nothing to see here if the first point isn't even in the interval
         return {};
