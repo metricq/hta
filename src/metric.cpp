@@ -275,7 +275,7 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_s
     check_read();
     if (begin > end)
     {
-        throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
+        throw_exception("Metric::retrieve(min_samples) invalid request: begin timestamp ", begin, " larger than end timestamp ",
                         end);
     }
     auto duration = end - begin;
@@ -289,7 +289,7 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
     check_read();
     if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
     {
-        throw_exception("invalid request: begin timestamp ", begin, " larger than end timestamp ",
+        throw_exception("Metric::retrieve(interval_upper_limit) invalid request: begin timestamp ", begin, " larger than end timestamp ",
                         end);
     }
     if (interval_upper_limit < interval_min_)

@@ -30,6 +30,7 @@
 #include "metric.hpp"
 
 #include <hta/filesystem.hpp>
+#include <hta/ostream.hpp>
 #include <hta/types.hpp>
 
 #include <algorithm>
@@ -163,6 +164,11 @@ std::size_t Metric::size(Duration interval)
 std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
                                                  IntervalScope scope)
 {
+    if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
+    {
+        throw_exception("storage::file::Metric::find_index invalid request: begin timestamp ",
+                        begin, " larger than end timestamp ", end);
+    }
     // Must be signed for comparision
     const auto sz = static_cast<int64_t>(size());
     if (sz == 0)
