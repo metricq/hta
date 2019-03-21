@@ -142,6 +142,10 @@ struct IntervalScope
 inline TimePoint interval_begin(TimePoint time, Duration interval)
 {
     Duration rem = time.time_since_epoch() % interval;
+    if (rem < Duration(0)) // well, that sucks
+    {
+        rem += interval;
+    }
     return time - rem;
 }
 

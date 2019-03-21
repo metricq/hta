@@ -192,7 +192,7 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 CHECK(result.active_time == 10s);
             }
 
-            SECTION("when the interval is excatly from one raw values to the next raw value")
+            SECTION("when the interval is exactly from one raw values to the next raw value")
             {
                 SECTION("Case A")
                 {

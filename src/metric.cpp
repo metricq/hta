@@ -129,7 +129,11 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
                         end);
     }
     // We must cap the end or we use intervals that are not yet completely written
-    end = std::min(end, range().second);
+    auto r = range();
+    // TODO We could further optimize requests from (before) the beginning of time by using the
+    // incomplete intervals of upper levels rather than piecing together raw/low ones
+    begin = std::clamp(begin, r.first, r.second);
+    end = std::clamp(end, r.first, r.second);
 
     auto interval = interval_min_;
 
@@ -142,16 +146,16 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     {
         // No need to go to any intervals or do any splits, just one raw chunk
         auto raw =
-            storage_metric_->get(begin, next_begin, IntervalScope{ Scope::open, Scope::extended });
+            storage_metric_->get(begin, end, IntervalScope{ Scope::closed, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : raw)
         {
             assert(previous_time <= tv.time);
-            if (tv.time > end)
+            if (tv.time >= end)
             {
                 // We add this for the integral but the point isn't actually in
-                auto partial_duration = next_begin - previous_time;
+                auto partial_duration = end - previous_time;
                 Aggregate partial_interval{
                     tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
                 };
@@ -169,14 +173,14 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     if (begin < next_begin)
     {
         // Add left raw side
-        auto left_raw =
-            storage_metric_->get(begin, next_begin, IntervalScope{ Scope::open, Scope::extended });
+        auto left_raw = storage_metric_->get(begin, next_begin,
+                                             IntervalScope{ Scope::closed, Scope::extended });
 
         auto previous_time = begin;
         for (auto tv : left_raw)
         {
             assert(previous_time <= tv.time);
-            if (tv.time > next_begin)
+            if (tv.time >= next_begin)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = next_begin - previous_time;
@@ -197,11 +201,11 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     {
         // Add right raw side
         auto right_raw =
-            storage_metric_->get(next_end, end, IntervalScope{ Scope::open, Scope::extended });
+            storage_metric_->get(next_end, end, IntervalScope{ Scope::closed, Scope::extended });
         auto previous_time = next_end;
         for (auto tv : right_raw)
         {
-            if (tv.time > end)
+            if (tv.time >= end)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = end - previous_time;
@@ -275,8 +279,8 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_s
     check_read();
     if (begin > end)
     {
-        throw_exception("Metric::retrieve(min_samples) invalid request: begin timestamp ", begin, " larger than end timestamp ",
-                        end);
+        throw_exception("Metric::retrieve(min_samples) invalid request: begin timestamp ", begin,
+                        " larger than end timestamp ", end);
     }
     auto duration = end - begin;
     auto interval_max_length = duration / min_samples;
@@ -289,8 +293,8 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
     check_read();
     if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
     {
-        throw_exception("Metric::retrieve(interval_upper_limit) invalid request: begin timestamp ", begin, " larger than end timestamp ",
-                        end);
+        throw_exception("Metric::retrieve(interval_upper_limit) invalid request: begin timestamp ",
+                        begin, " larger than end timestamp ", end);
     }
     if (interval_upper_limit < interval_min_)
     {
