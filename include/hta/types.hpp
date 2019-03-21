@@ -33,6 +33,8 @@
 
 #include <limits>
 
+#include <cassert>
+
 namespace hta
 {
 
@@ -141,16 +143,13 @@ struct IntervalScope
 
 inline TimePoint interval_begin(TimePoint time, Duration interval)
 {
+    assert(time.time_since_epoch().count() >= 0);
     Duration rem = time.time_since_epoch() % interval;
-    if (rem < Duration(0)) // well, that sucks
-    {
-        rem += interval;
-    }
     return time - rem;
 }
 
 inline TimePoint interval_end(TimePoint time, Duration interval)
 {
-    return interval_begin(time, interval) + interval;
+    return interval_begin(time + interval, interval);
 }
 } // namespace hta
