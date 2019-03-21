@@ -307,6 +307,10 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
         throw_exception("Metric::retrieve(interval_upper_limit) invalid request: begin timestamp ",
                         begin, " larger than end timestamp ", end);
     }
+    if (interval_upper_limit.count() < 0)
+    {
+        return { Row(end - begin, begin, aggregate(begin, end)) };
+    }
     if (interval_upper_limit < interval_min_)
     {
         return retrieve_raw_row(begin, end, scope);
