@@ -211,10 +211,7 @@ std::pair<uint64_t, uint64_t> Metric::find_index(TimePoint begin, TimePoint end,
         break;
     case Scope::open:
         index_end = find_index_on_or_after(end, sz);
-        if (index_end > 0)
-        {
-            index_end--;
-        }
+        index_end--;
         break;
     case Scope::extended:
         index_end = find_index_on_or_after(end, sz);
