@@ -137,9 +137,9 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
             {
                 auto result = metric.aggregate(tp(20s), tp(220s));
                 CHECK(result.count == 108);
-                CHECK(result.minimum == -36);
-                CHECK(result.maximum == 45);
-                CHECK(result.sum == 1985);
+                CHECK(result.minimum == -36.);
+                CHECK(result.maximum == 45.);
+                CHECK(result.sum == 1985.);
                 CHECK(result.mean_sum() == 1985 / 108.);
                 auto integral = (-36 * 1) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
                                 (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
@@ -152,10 +152,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
             {
                 auto result = metric.aggregate(tp(11s), tp(225s));
                 CHECK(result.count == 109);
-                CHECK(result.minimum == -36);
-                CHECK(result.maximum == 45);
-                CHECK(result.sum == 2020.);
-                CHECK(result.mean_sum() == 2020. / 109.);
+                CHECK(result.minimum == -37.);
+                CHECK(result.maximum == 45.);
+                CHECK(result.sum == 1948.);
+                CHECK(result.mean_sum() == 1948 / 109.);
                 auto integral = (-36 * 10) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
                                 (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
                                 (35 * 6);
@@ -198,10 +198,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 {
                     auto result = metric.aggregate(tp(11s), tp(21s));
                     CHECK(result.count == 1);
-                    CHECK(result.minimum == -36.);
-                    CHECK(result.maximum == -36.);
-                    CHECK(result.mean_sum() == -36.);
-                    CHECK(result.mean_integral() == -36.);
+                    CHECK(result.minimum == -37.);
+                    CHECK(result.maximum == -37.);
+                    CHECK(result.mean_sum() == -37.);
+                    CHECK(result.mean_integral() == -36. / 10.);
                     CHECK(result.active_time == 10s);
                 }
 
@@ -210,10 +210,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                     auto result = metric.aggregate(tp(21s), tp(42s));
                     CHECK(result.count == 1); // the right guy isn't technically inside the interval
                                               // as a point
-                    CHECK(result.sum == -30.);
-                    CHECK(result.minimum == -30.);
-                    CHECK(result.maximum == -30.);
-                    CHECK(result.mean_integral() == -30.);
+                    CHECK(result.sum == -36.);
+                    CHECK(result.minimum == -36.);
+                    CHECK(result.maximum == -36.);
+                    CHECK(result.mean_integral() == -30. / 21.);
                     CHECK(result.active_time == 21s);
                 }
             }
@@ -224,7 +224,7 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 CHECK(result.count == 0);
                 CHECK(result.minimum == -36);
                 CHECK(result.maximum == -36);
-                CHECK(result.mean_sum() == -36);
+                CHECK(result.mean_sum() == 0);
                 CHECK(result.mean_integral() == -36 / 8.0);
                 CHECK(result.active_time == 8s);
             }
@@ -293,8 +293,8 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 auto result = metric.aggregate(tp(225s), tp(504s));
 
                 CHECK(result.active_time == 0s);
-                CHECK(result.count == 0);
-                CHECK(result.sum == 0);
+                CHECK(result.count == 1);
+                CHECK(result.sum == 35);
                 CHECK(result.minimum == std::numeric_limits<hta::Value>::infinity());
                 CHECK(result.maximum == -std::numeric_limits<hta::Value>::infinity());
                 CHECK(result.integral == 0);
@@ -329,10 +329,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 auto result = metric.aggregate(tp(1s), tp(11s));
 
                 CHECK(result.active_time == 0s);
-                CHECK(result.count == 1);
-                CHECK(result.sum == -37);
-                CHECK(result.minimum == -37);
-                CHECK(result.maximum == -37);
+                CHECK(result.count == 0);
+                CHECK(result.sum == 0);
+                CHECK(result.minimum == std::numeric_limits<hta::Value>::infinity());
+                CHECK(result.maximum == -std::numeric_limits<hta::Value>::infinity());
                 CHECK(result.integral == 0);
             }
 
