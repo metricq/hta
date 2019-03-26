@@ -21,12 +21,21 @@ if(NOT HAS_STD_FILESYSTEM)
     else()
         set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_EXPERIMENTAL_STD_FILESYSTEM)
         # libstdc++ needs an extra lib for filesystem
-        set_target_properties(std::filesystem PROPERTIES INTERFACE_LINK_LIBRARIES stdc++fs)
+        target_link_libraries(std::filesystem INTERFACE
+            $<$<CXX_COMPILER_ID:GNU>:stdc++fs>
+            $<$<CXX_COMPILER_ID:AppleClang>:c++fs>
+            $<$<CXX_COMPILER_ID:Clang>:c++fs>
+        )
     endif()
 else()
     set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_STD_FILESYSTEM)
     # libstdc++ needs an extra lib for filesystem
-    set_target_properties(std::filesystem PROPERTIES INTERFACE_LINK_LIBRARIES stdc++fs)
+    target_link_libraries(std::filesystem INTERFACE
+        $<$<CXX_COMPILER_ID:GNU>:stdc++fs>
+        $<$<CXX_COMPILER_ID:AppleClang>:c++fs>
+        $<$<CXX_COMPILER_ID:Clang>:c++fs>
+    )
+
 endif()
 
 add_subdirectory(lib/catch)
