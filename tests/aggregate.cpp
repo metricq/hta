@@ -225,10 +225,11 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
             {
                 auto result = metric.aggregate(tp(12s), tp(20s));
                 CHECK(result.count == 0);
-                CHECK(result.minimum == -36);
-                CHECK(result.maximum == -36);
+                CHECK(result.minimum == -36.);
+                CHECK(result.maximum == -36.);
+                CHECK(result.sum == 0.);
                 CHECK(std::isnan(result.mean_sum()));
-                CHECK(result.mean_integral() == -36);
+                CHECK(result.mean_integral() == -36.);
                 CHECK(result.active_time == 8s);
             }
 
@@ -248,10 +249,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
 
                 CHECK(result.active_time == 9s);
                 CHECK(result.count == 1);
-                CHECK(result.sum == -37);
-                CHECK(result.minimum == -37);
-                CHECK(result.maximum == -36);
-                CHECK(result.integral == (-36 * 9) * hta::duration_cast(1s).count());
+                CHECK(result.sum == -37.);
+                CHECK(result.minimum == -37.);
+                CHECK(result.maximum == -36.);
+                CHECK(result.integral == (-36. * 9) * hta::duration_cast(1s).count());
             }
 
             SECTION("when the interval is the row before the first row")
@@ -270,10 +271,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
 
                 CHECK(result.active_time == 0s);
                 CHECK(result.count == 0);
-                CHECK(result.sum == 0);
+                CHECK(result.sum == 0.);
                 CHECK(result.minimum == std::numeric_limits<hta::Value>::infinity());
                 CHECK(result.maximum == -std::numeric_limits<hta::Value>::infinity());
-                CHECK(result.integral == 0);
+                CHECK(result.integral == 0.);
             }
         }
 
@@ -285,7 +286,7 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
 
                 CHECK(result.active_time == 0s);
                 CHECK(result.count == 0);
-                CHECK(result.sum == 0);
+                CHECK(result.sum == 0.);
                 CHECK(result.minimum == std::numeric_limits<hta::Value>::infinity());
                 CHECK(result.maximum == -std::numeric_limits<hta::Value>::infinity());
                 CHECK(result.integral == 0);
