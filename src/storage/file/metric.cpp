@@ -144,9 +144,12 @@ int64_t Metric::find_index_before_or_on(TimePoint t, int64_t sz)
     }
 
     // >= index points are now *before* t
+    // but we don't know if index itself is before or after t.. so go back one
+    index--;
     for (; index + 1 < sz && get_raw_ts(index + 1) <= t; index++)
         ;
 
+    assert(index >= 0); // should be covered by the check at beginning
     assert(get_raw_ts(index) <= t);
     assert(index == int64_t(sz - 1) || get_raw_ts(index + 1) > t);
     return index;
