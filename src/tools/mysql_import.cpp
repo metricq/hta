@@ -98,7 +98,7 @@ void import(sql::Connection& in_db, hta::Directory& out_directory,
             const std::string& in_metric_name, const std::string& out_metric_name,
             uint64_t min_timestamp, uint64_t max_timestamp)
 {
-    auto out_metric = out_directory[out_metric_name];
+    auto& out_metric = out_directory[out_metric_name];
 
     std::unique_ptr<sql::Statement> stmt(in_db.createStatement());
 
@@ -131,9 +131,9 @@ void import(sql::Connection& in_db, hta::Directory& out_directory,
             }
             previous_time = hta_time;
             // Note: Dataheap uses milliseconds. We use nanoseconds.
-            out_metric->insert({ hta_time, static_cast<double>(result.getDouble(2)) });
+            out_metric.insert({ hta_time, static_cast<double>(result.getDouble(2)) });
         });
-    out_metric->flush();
+    out_metric.flush();
     std::cout << "Imported " << row << " / " << r << " rows for metric: " << out_metric_name
               << "\n";
     std::cout << timer.format() << "\n";
@@ -180,12 +180,11 @@ int main(int argc, char* argv[])
     uint64_t max_timestamp = 0;
     bool auto_interval = false;
 
-    po::options_description desc("Import dataheap database into HTA.");
+    po::options_description desc("Import dataheap database into HTA");
     desc.add_options()("help", "produce help message")(
         "config,c", po::value(&config_file), "path to config file (default \"config.json\").")(
         "metric,m", po::value(&metric_name), "name of metric (default \"dummy\").")(
-        "database,d", po::value(&out_db_name),
-        "name of output database config (default \"test\").")(
+        "database,d", po::value(&out_db_name), "name of output database config (default \"test\").")(
         "import,i", po::value(&in_db_name), "name of input database config (default \"import\").")(
         "min-timestamp", po::value(&min_timestamp), "minimal timestamp for dump, in unix-ms")(
         "max-timestamp", po::value(&max_timestamp), "maximal timestamp for dump, in unix-ms")(
