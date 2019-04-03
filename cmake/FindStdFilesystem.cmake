@@ -118,7 +118,7 @@ if(StdFilesystem_FOUND)
 
     if(NOT _HAS_INTEGRATED_STD_FILESYSTEM AND NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
         target_link_libraries(std::filesystem INTERFACE ${StdFilesystem_LIBRARY})
-    elseif(NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
+    elseif(_HAS_BUNDLED_FILESYSTEM_LIBRARY)
         target_link_libraries(std::filesystem INTERFACE ${StdFSLibName})
     endif()
 
