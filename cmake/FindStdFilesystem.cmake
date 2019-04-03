@@ -102,7 +102,11 @@ if(NOT _HAS_INTEGRATED_STD_FILESYSTEM AND NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
         HAS_STD_FILESYSTEM
     )
 else()
-    set(OUTPUT_MESSAGE "Compiler integrated")
+    if(_HAS_INTEGRATED_STD_FILESYSTEM)
+        set(OUTPUT_MESSAGE "Compiler integrated")
+    else()
+        set(OUTPUT_MESSAGE "Using -l${StdFSLibName}")
+    endif()
     find_package_handle_standard_args(StdFilesystem
         "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and st andard library."
         OUTPUT_MESSAGE
