@@ -28,6 +28,7 @@
 
 include(FindPackageHandleStandardArgs)
 include(CheckCXXSymbolExists)
+include(CheckCXXSourceCompiles)
 
 if (StdFilesystem_LIBRARY)
     set(StdFilesystem_FIND_QUIETLY TRUE)
@@ -37,18 +38,49 @@ endif()
 CHECK_CXX_SYMBOL_EXISTS(_LIBCPP_VERSION ciso646 HAS_LIBCXX)
 CHECK_CXX_SYMBOL_EXISTS(__GLIBCXX__ ciso646 HAS_LIBSTDCXX)
 
+if(HAS_LIBSTDCXX)
+    set(StdFSLibName "stdc++fs")
+elseif(HAS_LIBCXX)
+    set(StdFSLibName "c++fs")
+endif()
+
 # detect if the headers are present
 set(CMAKE_REQUIRED_FLAGS "-std=c++17")
 CHECK_CXX_SYMBOL_EXISTS(std::filesystem::status_known filesystem HAS_STD_FILESYSTEM)
 CHECK_CXX_SYMBOL_EXISTS(std::experimental::filesystem::status_known experimental/filesystem HAS_EXPERIMENTAL_STD_FILESYSTEM)
 unset(CMAKE_REQUIRED_LIBRARIES)
 
-# check if we need to link an additional library
-if(HAS_STD_FILESYSTEM)
-    CHECK_CXX_SYMBOL_EXISTS(std::filesystem::exists filesystem NEEDS_STD_FILESYSTEM_LIBRARY)
-elseif(HAS_EXPERIMENTAL_STD_FILESYSTEM)
-    CHECK_CXX_SYMBOL_EXISTS(std::experimental::filesystem::exists filesystem _DONT_NEED_STD_FILESYSTEM_LIBRARY)
+# source code for further checks
+if(HAS_EXPERIMENTAL_STD_FILESYSTEM)
+    set(_CHECK_FILESYSTEM_CODE_PREFIX "
+#include <experimental/filesystem>
+namespace std
+{
+using namespace experimental;
+}")
+else()
+    set(_CHECK_FILESYSTEM_CODE_PREFIX "
+#include <filesystem>
+")
 endif()
+set(_CHECK_FILESYSTEM_CODE "
+${_CHECK_FILESYSTEM_CODE_PREFIX}
+int main(void)
+{
+    return std::filesystem::exists(std::filesystem::path(\"\"));
+}
+")
+
+# check if we need to link an additional library
+check_cxx_source_compiles("${_CHECK_FILESYSTEM_CODE}" _HAS_INTEGRATED_STD_FILESYSTEM)
+
+# check if we the compiler can find the filesystem library of its stdlib by itself
+if(NOT _HAS_INTEGRATED_STD_FILESYSTEM)
+    set(CMAKE_REQUIRED_LIBRARIES ${StdFSLibName})
+    check_cxx_source_compiles("${_CHECK_FILESYSTEM_CODE}" _HAS_BUNDLED_FILESYSTEM_LIBRARY)
+    unset(CMAKE_REQUIRED_LIBRARIES)
+endif()
+
 unset(CMAKE_REQUIRED_FLAGS)
 
 # if we only have it in experimental, we still have it
@@ -56,12 +88,10 @@ if(HAS_EXPERIMENTAL_STD_FILESYSTEM)
     set(HAS_STD_FILESYSTEM TRUE)
 endif()
 
-if(NOT _DONT_NEED_STD_FILESYSTEM_LIBRARY)
+if(NOT _HAS_INTEGRATED_STD_FILESYSTEM AND NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
     if(HAS_LIBSTDCXX)
-        set(StdFSLibName "stdc++fs")
         find_library(StdFilesystem_LIBRARY NAMES ${StdFSLibName} HINTS ENV LD_LIBRARY_PATH ENV LIBRARY_PATH ENV DYLD_LIBRARY_PATH)
     elseif(HAS_LIBCXX)
-        set(StdFSLibName "c++fs")
         find_library(StdFilesystem_LIBRARY NAMES ${StdFSLibName} HINTS ENV LD_LIBRARY_PATH ENV LIBRARY_PATH ENV DYLD_LIBRARY_PATH)
     else()
         message(WARNING "Couldn't detect your C++ standard library, but also couldn't link without an additional library. You'll probably receive linker errors.")
@@ -86,8 +116,10 @@ if(StdFilesystem_FOUND)
     add_library(std::filesystem INTERFACE IMPORTED)
     target_compile_features(std::filesystem INTERFACE cxx_std_17)
 
-    if(NOT _DONT_NEED_STD_FILESYSTEM_LIBRARY)
+    if(NOT _HAS_INTEGRATED_STD_FILESYSTEM AND NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
         target_link_libraries(std::filesystem INTERFACE ${StdFilesystem_LIBRARY})
+    elseif(NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
+        target_link_libraries(std::filesystem INTERFACE ${StdFSLibName})
     endif()
 
     if(HAS_EXPERIMENTAL_STD_FILESYSTEM)
