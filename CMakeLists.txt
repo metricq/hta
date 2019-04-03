@@ -6,37 +6,8 @@ set(CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake;${CMAKE_MODULE_PATH}")
 
 include(cmake/DefaultBuildType.cmake)
 
-include(CheckCXXSymbolExists)
+find_package(StdFilesystem REQUIRED)
 
-add_library(std::filesystem INTERFACE IMPORTED)
-set(CMAKE_REQUIRED_FLAGS "-std=c++17")
-CHECK_CXX_SYMBOL_EXISTS(std::filesystem::status_known filesystem HAS_STD_FILESYSTEM)
-set(CMAKE_REQUIRED_LIBRARIES "stdc++fs")
-CHECK_CXX_SYMBOL_EXISTS(std::experimental::filesystem::status_known experimental/filesystem HAS_EXPERIMENTAL_STD_FILESYSTEM)
-unset(CMAKE_REQUIRED_LIBRARIES)
-unset(CMAKE_REQUIRED_FLAGS)
-if(NOT HAS_STD_FILESYSTEM)
-    if(NOT HAS_EXPERIMENTAL_STD_FILESYSTEM)
-        message(SEND_ERROR "Cannot find std::filesystem, but it is required. Please use a fully C++17 compliant compiler.")
-    else()
-        set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_EXPERIMENTAL_STD_FILESYSTEM)
-        # libstdc++ needs an extra lib for filesystem
-        target_link_libraries(std::filesystem INTERFACE
-            $<$<CXX_COMPILER_ID:GNU>:stdc++fs>
-            $<$<CXX_COMPILER_ID:AppleClang>:c++fs>
-            $<$<CXX_COMPILER_ID:Clang>:c++fs>
-        )
-    endif()
-else()
-    set_target_properties(std::filesystem PROPERTIES INTERFACE_COMPILE_DEFINITIONS HAS_STD_FILESYSTEM)
-    # libstdc++ needs an extra lib for filesystem
-    target_link_libraries(std::filesystem INTERFACE
-        $<$<CXX_COMPILER_ID:GNU>:stdc++fs>
-        $<$<CXX_COMPILER_ID:AppleClang>:c++fs>
-        $<$<CXX_COMPILER_ID:Clang>:c++fs>
-    )
-
-endif()
 
 add_subdirectory(lib/catch)
 add_subdirectory(lib/json)

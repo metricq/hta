@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/metricq/hta.svg?branch=master)](https://travis-ci.com/metricq/hta)
+
 Hierarchical Timeline Aggregation
 =================================
 
