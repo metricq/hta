@@ -80,7 +80,6 @@ if(NOT _HAS_INTEGRATED_STD_FILESYSTEM)
     check_cxx_source_compiles("${_CHECK_FILESYSTEM_CODE}" _HAS_BUNDLED_FILESYSTEM_LIBRARY)
     unset(CMAKE_REQUIRED_LIBRARIES)
 endif()
-
 unset(CMAKE_REQUIRED_FLAGS)
 
 # if we only have it in experimental, we still have it
@@ -94,18 +93,18 @@ if(NOT _HAS_INTEGRATED_STD_FILESYSTEM AND NOT _HAS_BUNDLED_FILESYSTEM_LIBRARY)
     elseif(HAS_LIBCXX)
         find_library(StdFilesystem_LIBRARY NAMES ${StdFSLibName} HINTS ENV LD_LIBRARY_PATH ENV LIBRARY_PATH ENV DYLD_LIBRARY_PATH)
     else()
-        message(WARNING "Couldn't detect your C++ standard library, but also couldn't link without an additional library. You'll probably receive linker errors.")
+        message(WARNING "Couldn't detect your C++ standard library, but also couldn't link without an additional library. This is bad.")
     endif()
 
     find_package_handle_standard_args(StdFilesystem
-        "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and stdandard library."
+        "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and standard library."
         StdFilesystem_LIBRARY
         HAS_STD_FILESYSTEM
     )
 else()
     set(OUTPUT_MESSAGE "Compiler integrated")
     find_package_handle_standard_args(StdFilesystem
-        "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and stdandard library."
+        "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and st andard library."
         OUTPUT_MESSAGE
         HAS_STD_FILESYSTEM
     )
@@ -120,6 +119,7 @@ if(StdFilesystem_FOUND)
         target_link_libraries(std::filesystem INTERFACE ${StdFilesystem_LIBRARY})
     elseif(_HAS_BUNDLED_FILESYSTEM_LIBRARY)
         target_link_libraries(std::filesystem INTERFACE ${StdFSLibName})
+        set(StdFilesystem_LIBRARY ${StdFSLibName})
     endif()
 
     if(HAS_EXPERIMENTAL_STD_FILESYSTEM)
