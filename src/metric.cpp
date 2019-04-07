@@ -101,10 +101,17 @@ std::vector<Row> Metric::retrieve_raw_row(TimePoint begin, TimePoint end, Interv
 {
     auto result_tv = storage_metric_->get(begin, end, scope);
     std::vector<Row> result;
+    if (result_tv.empty())
+    {
+        return result;
+    }
+    auto previous_timestamp = result_tv[0].time;
     result.reserve(result_tv.size());
     for (auto tv : result_tv)
     {
-        result.emplace_back(Duration(0), tv.time, Aggregate(tv.value));
+        result.emplace_back(Duration(0), tv.time,
+                            Aggregate(tv.value, tv.time - previous_timestamp));
+        previous_timestamp = tv.time;
     }
     return result;
 }
