@@ -173,22 +173,22 @@ void select_interval(sql::Connection& con, json& metric_config, const std::strin
 int main(int argc, char* argv[])
 {
     std::string config_file = "config.json";
-    std::string metric_name = "dummy";
-    std::string out_db_name = "test";
-    std::string in_db_name = "import";
     uint64_t min_timestamp = 0;
     uint64_t max_timestamp = 0;
     bool auto_interval = false;
 
     po::options_description desc("Import dataheap database into HTA");
-    desc.add_options()("help", "produce help message")(
+
+    // clang-format off
+    desc.add_options()(
+        "help", "produce help message")(
         "config,c", po::value(&config_file), "path to config file (default \"config.json\").")(
-        "metric,m", po::value(&metric_name), "name of metric (default \"dummy\").")(
-        "database,d", po::value(&out_db_name), "name of output database config (default \"test\").")(
-        "import,i", po::value(&in_db_name), "name of input database config (default \"import\").")(
+        "metric,m", po::value<std::string>(), "name of metric")(
+        "import-metric", po::value<std::string>(), "import name of metric")(
         "min-timestamp", po::value(&min_timestamp), "minimal timestamp for dump, in unix-ms")(
         "max-timestamp", po::value(&max_timestamp), "maximal timestamp for dump, in unix-ms")(
-        "auto-interval", po::bool_switch(&auto_interval), "automatically select an interval");
+        "auto-interval,a", po::bool_switch(&auto_interval), "automatically select an interval");
+    // clang-format on
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -200,10 +200,27 @@ int main(int argc, char* argv[])
         return 0;
     };
 
+    if (!vm.count("metric"))
+    {
+        std::cerr << "Error: Missing argument for import metric\n";
+        std::cout << desc << "\n";
+        return 1;
+    }
+
+    // f"ur Tausendertrennzeichen
     std::cout.imbue(std::locale(""));
-    std::string in_metric_name = metric_name;
-    std::string out_metric_name = metric_name;
-    std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
+
+    auto out_metric_name = vm["metric"].as<std::string>();
+    auto in_metric_name = out_metric_name;
+
+    if (vm.count("import-metric"))
+    {
+        in_metric_name = vm["import-metric"].as<std::string>();
+    }
+    else
+    {
+        std::replace(in_metric_name.begin(), in_metric_name.end(), '.', '_');
+    }
     // DO NOT do this. There are metrics like foo/bar_baz, which should be foo.bar_baz
     // std::replace(out_metric_name.begin(), out_metric_name.end(), '_', '.');
 
@@ -218,7 +235,7 @@ int main(int argc, char* argv[])
     std::string host = conf_import["host"];
     std::string user = conf_import["user"];
     std::string password = conf_import["password"];
-    std::string schema = conf_import["schema"];
+    std::string schema = conf_import["database"];
     std::unique_ptr<sql::Connection> con(driver->connect(host, user, password));
     con->setSchema(schema);
 
