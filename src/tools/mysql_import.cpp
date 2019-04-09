@@ -191,12 +191,12 @@ void import(sql::Connection& in_db, hta::Directory& out_directory,
               << "Insert data into metric..." << std::endl;
     for (const auto& row : rows)
     {
-        if (min_timestamp && row.time < min_timestamp)
+        if (min_timestamp && row.time.time_since_epoch() < std::chrono::milliseconds(min_timestamp))
         {
             continue;
         }
 
-        if (max_timestamp && row.time > max_timestamp)
+        if (max_timestamp && row.time.time_since_epoch() > std::chrono::milliseconds(max_timestamp))
         {
             continue;
         }
