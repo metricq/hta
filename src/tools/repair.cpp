@@ -83,6 +83,7 @@ void raw_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval)
 int main(int argc, char* argv[])
 {
     assert(argc == 4);
+    (void)argc;
     std::string config_file = argv[1];
     std::string src_name = argv[2];
     std::string dst_name = argv[3];
