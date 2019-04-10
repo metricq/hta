@@ -80,6 +80,8 @@ void dump_header(const std::filesystem::path& path)
 
 int main(int argc, char* argv[])
 {
+    std::cout << "Size of a TimeValue: " << sizeof(hta::TimePoint) << "\n";
+    std::cout << "Size of a TimeAggregate: " << sizeof(hta::TimeAggregate) << "\n";
     if (argc != 2)
     {
         return -1;
