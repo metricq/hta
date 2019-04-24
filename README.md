@@ -19,11 +19,21 @@ An aggregate consists of an unsigned 64-bit integer for the count and an IEEE-75
 Storing a metric in an HTA
 --------------------------
 
-### Selecting a good metric names
+### Selecting good metric names
 
-Metric names can contain all alphanumerical characters and some others, among them are `-`, `_`, and `.`. Invalid characters are `/` and `#`. The metric name cannot be longer than 255 characters. The `.` character is used to create hierarchical metric names, which ease the handling of a large number of metrics. The name should start with the most generic description of the metric, like department or building, and get more and more specific towards the end of the name, for example `building.room.rack.blade.cpu.measurement_domain`.
+Metrics have a unique name which is composed of fragments separated by dots (`.`).
+While there is no rigid specification for metric names, each fragment should be self-descriptive.
+Components of multiple metrics form a tree, presenting a hierarchy with the first component containing the largest set of metrics.
+Typically, the last fragment specifies a measured quantity, where the others specify a system component or location.
+An example name would be `elab.ariel.s0.dram.power`, where `elab` is the name of a laboratory, `ariel` a hostname, `s0` short for the first socket, `dram` for the memory within the socket, and `power` is the measured quantity.
+The hierarchy in the naming, allows to easily refer to a set of metrics, e.g. all metrics for elab.ariel.
+
+Metric names can contain all alphanumerical characters and some others.
+Invalid characters are `/`, ` ` (space), and `#`.
+The metric name cannot be longer than 255 characters.
 
 While a larger set of names are still valid choices, a good metric name should match the following regular expression:
+
 ```
 ([a-zA-Z][a-zA-Z0-9-_]+\.)+[a-zA-Z][a-zA-Z0-9-_]+
 ```
@@ -32,6 +42,9 @@ Examples for good names are:
  - elab.bahka.power
  - elab.ariel.package0.dram.current
  - taurus.taurusi4101.cpu0.power
+ 
+ Of course there are exceptions.
+ Sometimes it can be helpful to add a modifying postfix, e.g. for different variants of the same quantity, e.g. wideband measurement.
 
 ### Planning the aggregation parameters
 
