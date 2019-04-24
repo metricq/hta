@@ -21,30 +21,7 @@ Storing a metric in an HTA
 
 ### Selecting good metric names
 
-Metrics have a unique name which is composed of fragments separated by dots (`.`).
-While there is no rigid specification for metric names, each fragment should be self-descriptive.
-Components of multiple metrics form a tree, presenting a hierarchy with the first component containing the largest set of metrics.
-Typically, the last fragment specifies a measured quantity, where the others specify a system component or location.
-An example name would be `elab.ariel.s0.dram.power`, where `elab` is the name of a laboratory, `ariel` a hostname, `s0` short for the first socket, `dram` for the memory within the socket, and `power` is the measured quantity.
-The hierarchy in the naming, allows to easily refer to a set of metrics, e.g. all metrics for elab.ariel.
-
-Metric names can contain all alphanumerical characters and some others.
-Invalid characters are `/`, ` ` (space), and `#`.
-The metric name cannot be longer than 255 characters.
-
-While a larger set of names are still valid choices, a good metric name should match the following regular expression:
-
-```
-([a-zA-Z][a-zA-Z0-9-_]+\.)+[a-zA-Z][a-zA-Z0-9-_]+
-```
-
-Examples for good names are:
- - elab.bahka.power
- - elab.ariel.package0.dram.current
- - taurus.taurusi4101.cpu0.power
- 
- Of course there are exceptions.
- Sometimes it can be helpful to add a modifying postfix, e.g. for different variants of the same quantity, e.g. wideband measurement.
+See [the Metric page in the MetricQ Wiki](https://github.com/metricq/metricq/wiki/Metrics#selecting-good-metric-names).
 
 ### Planning the aggregation parameters
 
