@@ -39,6 +39,19 @@
 
 #include <cmath>
 
+// from https://stackoverflow.com/a/36315819/620382
+#define PBSTR "||||||||||||||||||||||||||||||||||||||||||||||||||||||||||||"
+#define PBWIDTH 60
+
+void print_progress(double percentage)
+{
+    int val = (int)(percentage * 100);
+    int lpad = (int)(percentage * PBWIDTH);
+    int rpad = PBWIDTH - lpad;
+    printf("\r%3d%% [%.*s%*s]", val, lpad, PBSTR, rpad, "");
+    fflush(stdout);
+}
+
 constexpr size_t chunk_size = 4096;
 
 namespace hta::storage::file
@@ -52,6 +65,7 @@ void check_raw(File<Metric::Header, TimeValue>& file)
     size_t issue_count = 0;
     for (size_t chunk_begin = 0; chunk_begin < size; chunk_begin += chunk_size)
     {
+        print_progress((double)chunk_begin / size);
         data.resize(std::min(chunk_size, size - chunk_begin));
         file.read(data, chunk_begin);
         for (size_t index = 0; index < data.size(); index++)
@@ -82,6 +96,7 @@ void check_raw(File<Metric::Header, TimeValue>& file)
             }
         }
     }
+    print_progress(1);
     std::cout << "Finished check of " << size << " entries: " << issue_count << " issues.";
 }
 
@@ -96,6 +111,7 @@ void check_hta(File<Metric::Header, TimeAggregate>& file, Duration interval, Tim
     size_t issue_count = 0;
     for (size_t chunk_begin = 0; chunk_begin < size; chunk_begin += chunk_size)
     {
+        print_progress((double)chunk_begin / size);
         data.resize(std::min(chunk_size, size - chunk_begin));
         file.read(data, chunk_begin);
         for (size_t sub_index = 0; sub_index < data.size(); sub_index++)
@@ -134,7 +150,9 @@ void check_hta(File<Metric::Header, TimeAggregate>& file, Duration interval, Tim
             }
         }
     }
-    std::cout << "Finished check of " << size << " entries: " << issue_count << " issues.\n";
+    print_progress(1);
+    std::cout << "Finished check of " << size << " entries: " << issue_count << " issues."
+              << std::endl;
 }
 
 void check(const std::filesystem::path& dir)
@@ -144,7 +162,7 @@ void check(const std::filesystem::path& dir)
                                               dir / std::filesystem::path("raw.hta") };
     if (raw_file.size() == 0)
     {
-        std::cout << "empty raw file";
+        std::cout << "empty raw file" << std::endl;
         return;
     }
     auto raw_epoch = raw_file.read(0).time;
