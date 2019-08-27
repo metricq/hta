@@ -95,6 +95,7 @@ int main(int argc, char* argv[])
 {
     if (argc != 5) {
         std::cerr << "usage: hta_repair config.json source destination cooldown_ms\n";
+        return -1;
     }
     (void)argc;
     std::string config_file = argv[1];
