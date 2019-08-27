@@ -52,10 +52,11 @@ json read_json_from_file(const std::filesystem::path& path)
     return config;
 }
 
-void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval)
+void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_period,
+    hta::Duration chunk_interval=hta::duration_cast(std::chrono::hours(48)))
 {
     auto total_range = src.range();
-    size_t processed = 0;
+    size_t read = 0, written = 0;
     auto count = src.count();
     hta::TimePoint previous_time;
     for (auto t0 = total_range.first; t0 <= total_range.second; t0 += chunk_interval)
@@ -63,35 +64,43 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
         auto data = src.retrieve(t0, t0 + chunk_interval, { hta::Scope::closed, hta::Scope::open });
         for (auto tv : data)
         {
-            processed++;
-            if (processed % 100000000 == 0 || processed == count)
+            read++;
+            if (read % 100000000 == 0 || read == count)
             {
-                std::cout << processed << " / " << count << std::endl;
+                std::cout << read << " / " << count << std::endl;
             }
             if (tv.time <= previous_time)
             {
-                std::cout << "Non-Monotonic time " << tv.time << " at index " << (processed - 1)
+                std::cerr << "Non-Monotonic time " << tv.time << " at index " << (read - 1)
                           << std::endl;
                 continue;
             }
-            previous_time = tv.time;
-            dst.insert(tv);
+            if (previous_time + cooldown_period < tv.time)
+            {
+                previous_time = tv.time;
+                dst.insert(tv);
+                written ++;
+            }
         }
     }
+    std::cout << "completed, read: " << read << ", written: " << written << std::endl;
 }
 
 int main(int argc, char* argv[])
 {
-    assert(argc == 4);
+    if (argc != 5) {
+        std::cerr << "usage: hta_repair config.json source destination cooldown_ms\n";
+    }
     (void)argc;
     std::string config_file = argv[1];
     std::string src_name = argv[2];
     std::string dst_name = argv[3];
+    auto cooldown = hta::duration_cast(std::chrono::milliseconds(atoi(argv[4])));
 
     auto config = read_json_from_file(std::filesystem::path(config_file));
     hta::Directory directory(config);
 
     std::cout.imbue(std::locale(""));
     throttle_copy(directory[src_name], directory[dst_name],
-                  hta::duration_cast(std::chrono::hours(1024)));
+                  cooldown);
 }

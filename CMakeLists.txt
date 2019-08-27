@@ -57,8 +57,11 @@ if(Boost_FOUND)
 
     add_executable(hta_repair src/tools/repair.cpp)
     target_link_libraries(hta_repair PRIVATE hta::hta)
+
+    add_executable(hta_throttle src/tools/throttle.cpp)
+    target_link_libraries(hta_throttle PRIVATE hta::hta)
 else()
-    message(STATUS "Will not build hta_dummy, hta_dump, hta_repair missing boost")
+    message(STATUS "Will not build hta_dummy, hta_dump, hta_throttle missing boost")
 endif()
 
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
