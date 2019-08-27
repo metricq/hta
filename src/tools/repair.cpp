@@ -58,7 +58,6 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
 {
     auto total_range = src.range();
     size_t processed = 0;
-    auto count = src.count();
     hta::TimePoint previous_time;
     for (auto t0 = total_range.first; t0 <= total_range.second; t0 += chunk_interval)
     {
@@ -68,10 +67,6 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
         for (auto tv : data)
         {
             processed++;
-            if (processed % 100000000 == 0 || processed == count)
-            {
-                std::cout << processed << " / " << count << std::endl;
-            }
             if (tv.time <= previous_time)
             {
                 std::cout << "Non-Monotonic time " << tv.time << " at index " << (processed - 1)

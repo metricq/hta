@@ -27,6 +27,8 @@
 // LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#include "util.hpp"
+
 #include <hta/hta.hpp>
 #include <hta/ostream.hpp>
 
@@ -61,6 +63,8 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_pe
     hta::TimePoint previous_time;
     for (auto t0 = total_range.first; t0 <= total_range.second; t0 += chunk_interval)
     {
+        print_progress(static_cast<double>((t0 - total_range.first).count()) /
+                       (total_range.second - total_range.first).count());
         auto data = src.retrieve(t0, t0 + chunk_interval, { hta::Scope::closed, hta::Scope::open });
         for (auto tv : data)
         {
@@ -83,6 +87,7 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_pe
             }
         }
     }
+    print_progress(1);
     std::cout << "completed, read: " << read << ", written: " << written << std::endl;
 }
 
