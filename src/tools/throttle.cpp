@@ -55,7 +55,7 @@ json read_json_from_file(const std::filesystem::path& path)
 }
 
 void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_period,
-    hta::Duration chunk_interval=hta::duration_cast(std::chrono::hours(48)))
+    hta::Duration chunk_interval=hta::duration_cast(std::chrono::hours(30 * 24)))
 {
     auto total_range = src.range();
     size_t read = 0, written = 0;
