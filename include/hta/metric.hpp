@@ -128,6 +128,10 @@ public: // read
                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
     std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
                                     IntervalScope scope = { Scope::closed, Scope::extended });
+    // TODO decide on proper name
+    std::variant<std::vector<Row>, std::vector<TimeValue>>
+    retrieve_flex(TimePoint begin, TimePoint end, Duration interval_max,
+                  IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
     // technically this is IntervalScope{ Scope::closed, Scope::open } and used LAST semantics
     Aggregate aggregate(TimePoint begin, TimePoint end);
     size_t count(TimePoint begin, TimePoint end,

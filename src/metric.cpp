@@ -97,25 +97,6 @@ void Metric::check_write() const
  * read methods
  */
 
-std::vector<Row> Metric::retrieve_raw_row(TimePoint begin, TimePoint end, IntervalScope scope)
-{
-    auto result_tv = storage_metric_->get(begin, end, scope);
-    std::vector<Row> result;
-    if (result_tv.empty())
-    {
-        return result;
-    }
-    auto previous_timestamp = result_tv[0].time;
-    result.reserve(result_tv.size());
-    for (auto tv : result_tv)
-    {
-        result.emplace_back(Duration(0), tv.time,
-                            Aggregate(tv.value, tv.time - previous_timestamp));
-        previous_timestamp = tv.time;
-    }
-    return result;
-}
-
 std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, IntervalScope scope)
 {
     check_read();
@@ -305,8 +286,9 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_s
     return retrieve(begin, end, interval_max_length, scope);
 }
 
-std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration interval_upper_limit,
-                                  IntervalScope scope)
+std::variant<std::vector<Row>, std::vector<TimeValue>>
+Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_limit,
+                      IntervalScope scope)
 {
     check_read();
     if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
@@ -316,11 +298,11 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
     }
     if (interval_upper_limit.count() < 0)
     {
-        return { Row(end - begin, begin, aggregate(begin, end)) };
+        return std::vector<Row>{ Row(end - begin, begin, aggregate(begin, end)) };
     }
     if (interval_upper_limit < interval_min_)
     {
-        return retrieve_raw_row(begin, end, scope);
+        return retrieve(begin, end, scope);
     }
     auto interval = interval_min_;
     interval_upper_limit = std::min(interval_upper_limit, interval_max_);
@@ -345,8 +327,35 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration inter
         interval = interval / interval_factor_;
     } while (interval >= interval_min_);
     // No data at all
-    return {};
+    return std::vector<TimeValue>{};
 }
+
+std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration interval_upper_limit,
+                                  IntervalScope scope)
+{
+    auto flex = retrieve_flex(begin, end, interval_upper_limit, scope);
+    if (auto pro = std::get_if<std::vector<Row>>(&flex))
+    {
+        // TODO check if that is correct
+        // TODO check if that is actually efficient, i.e., zero-copy
+        return std::move(*pro);
+    }
+    const auto& result_tv = std::get<std::vector<TimeValue>>(flex);
+    std::vector<Row> result;
+    if (result_tv.empty())
+    {
+        return result;
+    }
+    auto previous_timestamp = result_tv[0].time;
+    result.reserve(result_tv.size());
+    for (auto tv : result_tv)
+    {
+        result.emplace_back(Duration(0), tv.time,
+                            Aggregate(tv.value, tv.time - previous_timestamp));
+        previous_timestamp = tv.time;
+    }
+    return result;
+} // namespace hta
 
 std::pair<TimePoint, TimePoint> Metric::range()
 {
