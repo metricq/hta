@@ -43,12 +43,16 @@ add_executable(hta.test_prefix prefix.cpp)
 add_test(hta.test_prefix hta.test_prefix)
 target_link_libraries(hta.test_prefix PRIVATE hta::hta catch::catch json::json)
 
+add_executable(hta.test_flex flex.cpp)
+add_test(hta.test_flex hta.test_flex)
+target_link_libraries(hta.test_flex PRIVATE hta::hta catch::catch json::json)
+
 find_package(benchmark QUIET)
 if (benchmark_FOUND)
     message(STATUS "Looking for google benchmark - found, will build benchmark tests.")
 
     add_executable(hta.bench bench.cpp)
     target_link_libraries(hta.bench PRIVATE hta::hta json::json benchmark::benchmark)
-else()
+else ()
     message(STATUS "Looking for google benchmark - not found, skipping benchmark tests.")
-endif()
+endif ()

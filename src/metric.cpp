@@ -288,8 +288,9 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_s
 
 std::variant<std::vector<Row>, std::vector<TimeValue>>
 Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_limit,
-                      IntervalScope scope)
+                      IntervalScope scope, bool smooth)
 {
+    (void)smooth; // will be used soon
     check_read();
     if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
     {
@@ -333,7 +334,7 @@ Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_li
 std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, Duration interval_upper_limit,
                                   IntervalScope scope)
 {
-    auto flex = retrieve_flex(begin, end, interval_upper_limit, scope);
+    auto flex = retrieve_flex(begin, end, interval_upper_limit, scope, false);
     if (auto pro = std::get_if<std::vector<Row>>(&flex))
     {
         // TODO check if that is correct
