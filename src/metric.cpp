@@ -318,7 +318,6 @@ Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_li
         if (smooth)
         {
             smooth_factor = interval_upper_limit / interval;
-            std::cerr << "Using smooth factor " << smooth_factor << "\n";
         }
         auto result = storage_metric_->get(begin, end, interval, scope);
         if (!result.empty())
