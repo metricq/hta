@@ -132,7 +132,7 @@ public: // read
     std::variant<std::vector<Row>, std::vector<TimeValue>>
     retrieve_flex(TimePoint begin, TimePoint end, Duration interval_max,
                   IntervalScope scope = IntervalScope{ Scope::extended, Scope::open },
-                  bool smooth = true);
+                  bool smooth = false);
     // technically this is IntervalScope{ Scope::closed, Scope::open } and used LAST semantics
     Aggregate aggregate(TimePoint begin, TimePoint end);
     size_t count(TimePoint begin, TimePoint end,

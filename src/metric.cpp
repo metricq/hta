@@ -36,6 +36,7 @@
 #include <hta/ostream.hpp>
 
 #include <algorithm>
+#include <iostream>
 #include <limits>
 #include <utility>
 #include <vector>
@@ -290,7 +291,6 @@ std::variant<std::vector<Row>, std::vector<TimeValue>>
 Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_limit,
                       IntervalScope scope, bool smooth)
 {
-    (void)smooth; // will be used soon
     check_read();
     if (begin > end && scope.begin != Scope::infinity && scope.end != Scope::infinity)
     {
@@ -313,15 +313,52 @@ Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_li
     }
     do
     {
+        assert(interval <= interval_upper_limit);
+        int smooth_factor = 1;
+        if (smooth)
+        {
+            smooth_factor = interval_upper_limit / interval;
+            std::cerr << "Using smooth factor " << smooth_factor << "\n";
+        }
         auto result = storage_metric_->get(begin, end, interval, scope);
         if (!result.empty())
         {
             std::vector<Row> rows;
-            rows.reserve(result.size());
-            std::transform(result.begin(), result.end(), std::back_inserter(rows),
-                           [interval](TimeAggregate ta) -> Row {
-                               return { interval, ta };
-                           });
+            rows.reserve(result.size() / smooth_factor + smooth_factor - 1);
+            if (smooth_factor == 0)
+            {
+                std::transform(result.begin(), result.end(), std::back_inserter(rows),
+                               [interval](TimeAggregate ta) -> Row {
+                                   return { interval, ta };
+                               });
+            }
+            else
+            {
+                TimeAggregate* current = nullptr;
+                int current_count = 0;
+                for (TimeAggregate& ta : result)
+                {
+                    if (!current)
+                    {
+                        current = &ta;
+                        current_count = 1;
+                    }
+                    else
+                    {
+                        current->aggregate += ta.aggregate;
+                        current_count++;
+                    }
+                    if (current_count == smooth_factor)
+                    {
+                        rows.emplace_back(interval, *current);
+                        current = nullptr;
+                    }
+                }
+                if (current)
+                {
+                    rows.emplace_back(interval, *current);
+                }
+            }
             return rows;
         }
         // If the requested level has no data yet, we must ask the lower levels
