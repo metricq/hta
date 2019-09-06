@@ -308,10 +308,15 @@ std::vector<Row> convert_timevalues_smooth(const std::vector<TimeValue>& raw_tvs
         const auto current_end = std::min<TimePoint>(current_begin + interval, end);
 
         Aggregate agg;
-        for (; tv_it->time < current_end; ++tv_it)
+        for (; tv_it != tv_end && tv_it->time < current_end; ++tv_it)
         {
             agg += Aggregate(tv_it->value, tv_it->time - previous_tp);
             previous_tp = tv_it->time;
+        }
+        if (tv_it == tv_end)
+        {
+            rows.emplace_back(interval, current_begin, agg);
+            return rows;
         }
         // tv_it->time >= next_begin
         auto partial_duration = current_end - previous_tp;
