@@ -287,6 +287,89 @@ std::vector<Row> Metric::retrieve(TimePoint begin, TimePoint end, uint64_t min_s
     return retrieve(begin, end, interval_max_length, scope);
 }
 
+std::vector<Row> convert_timevalues_smooth(const std::vector<TimeValue>& raw_tvs, TimePoint begin,
+                                           TimePoint end, Duration interval)
+{
+    std::vector<Row> rows;
+    rows.reserve((end - begin) / interval + 1);
+    assert(raw_tvs.size() > 0);
+    auto tv_it = raw_tvs.begin();
+    auto tv_end = raw_tvs.end();
+    auto previous_tp = std::min(begin, tv_it->time);
+
+    for (; tv_it != tv_end && tv_it->time < begin; ++tv_it)
+    {
+        previous_tp = tv_it->time;
+    }
+
+    for (TimePoint current_begin = begin; current_begin < end; current_begin += interval)
+    {
+        assert(tv_it->time >= current_begin);
+        const auto current_end = std::min<TimePoint>(current_begin + interval, end);
+
+        Aggregate agg;
+        for (; tv_it->time < current_end; ++tv_it)
+        {
+            agg += Aggregate(tv_it->value, tv_it->time - previous_tp);
+            previous_tp = tv_it->time;
+        }
+        // tv_it->time >= next_begin
+        auto partial_duration = current_end - previous_tp;
+        // WTF clang-format?!
+        Aggregate partial_interval{
+            tv_it->value,    tv_it->value, 0, 0, tv_it->value * partial_duration.count(),
+            partial_duration
+        };
+        agg += partial_interval;
+        previous_tp = current_end;
+        rows.emplace_back(interval, current_begin, agg);
+    }
+    return rows;
+}
+
+static std::vector<Row> convert_timeaggregates_to_rows(std::vector<TimeAggregate>& tas,
+                                                       Duration interval, int smooth_factor)
+{
+    std::vector<Row> rows;
+    rows.reserve(tas.size() / smooth_factor + smooth_factor - 1);
+    if (smooth_factor == 1)
+    {
+        std::transform(tas.begin(), tas.end(), std::back_inserter(rows),
+                       [interval](TimeAggregate ta) -> Row {
+                           return { interval, ta };
+                       });
+    }
+    else
+    {
+        assert(smooth_factor > 1);
+        TimeAggregate* current = nullptr;
+        int current_count = 0;
+        for (TimeAggregate& ta : tas)
+        {
+            if (!current)
+            {
+                current = &ta;
+                current_count = 1;
+            }
+            else
+            {
+                current->aggregate += ta.aggregate;
+                current_count++;
+            }
+            if (current_count == smooth_factor)
+            {
+                rows.emplace_back(interval, *current);
+                current = nullptr;
+            }
+        }
+        if (current)
+        {
+            rows.emplace_back(interval, *current);
+        }
+    }
+    return rows;
+}
+
 std::variant<std::vector<Row>, std::vector<TimeValue>>
 Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_limit,
                       IntervalScope scope, bool smooth)
@@ -299,11 +382,25 @@ Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_li
     }
     if (interval_upper_limit.count() < 0)
     {
+        // Get single aggregate
         return std::vector<Row>{ Row(end - begin, begin, aggregate(begin, end)) };
     }
     if (interval_upper_limit < interval_min_)
     {
-        return retrieve(begin, end, scope);
+        // Use raw data
+        auto raw_ts = retrieve(begin, end, scope);
+        if (raw_ts.empty())
+        {
+            return raw_ts;
+        }
+        auto average_interval = (end - begin) / raw_ts.size();
+        if (average_interval < interval_upper_limit && smooth)
+        {
+            // too many raw data points, must reduce
+            // TODO respect scope
+            return convert_timevalues_smooth(raw_ts, begin, end, interval_upper_limit);
+        }
+        return raw_ts;
     }
     auto interval = interval_min_;
     interval_upper_limit = std::min(interval_upper_limit, interval_max_);
@@ -314,51 +411,15 @@ Metric::retrieve_flex(TimePoint begin, TimePoint end, Duration interval_upper_li
     do
     {
         assert(interval <= interval_upper_limit);
-        int smooth_factor = 1;
-        if (smooth)
-        {
-            smooth_factor = interval_upper_limit / interval;
-        }
         auto result = storage_metric_->get(begin, end, interval, scope);
         if (!result.empty())
         {
-            std::vector<Row> rows;
-            rows.reserve(result.size() / smooth_factor + smooth_factor - 1);
-            if (smooth_factor == 0)
+            int smooth_factor = 1;
+            if (smooth)
             {
-                std::transform(result.begin(), result.end(), std::back_inserter(rows),
-                               [interval](TimeAggregate ta) -> Row {
-                                   return { interval, ta };
-                               });
+                smooth_factor = interval_upper_limit / interval;
             }
-            else
-            {
-                TimeAggregate* current = nullptr;
-                int current_count = 0;
-                for (TimeAggregate& ta : result)
-                {
-                    if (!current)
-                    {
-                        current = &ta;
-                        current_count = 1;
-                    }
-                    else
-                    {
-                        current->aggregate += ta.aggregate;
-                        current_count++;
-                    }
-                    if (current_count == smooth_factor)
-                    {
-                        rows.emplace_back(interval, *current);
-                        current = nullptr;
-                    }
-                }
-                if (current)
-                {
-                    rows.emplace_back(interval, *current);
-                }
-            }
-            return rows;
+            return convert_timeaggregates_to_rows(result, interval, smooth_factor);
         }
         // If the requested level has no data yet, we must ask the lower levels
         interval = interval / interval_factor_;

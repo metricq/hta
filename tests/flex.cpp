@@ -117,7 +117,7 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
         {
             auto flex =
-                metric.retrieve_flex(tp(0s), tp(300s), hta::duration_cast(std::chrono::seconds(9)));
+                metric.retrieve_flex(tp(0s), tp(300s), hta::duration_cast(std::chrono::seconds(1)));
             CHECK(std::holds_alternative<std::vector<hta::TimeValue>>(flex));
             const auto& result = std::get<std::vector<hta::TimeValue>>(flex);
             CHECK(result.size() == 110);
