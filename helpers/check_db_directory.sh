@@ -12,11 +12,7 @@ else
 fi
 
 # try possible locations of hta_check
-CHECK_BASE="."
-if [ "$(pwd)" == "$(basename "$0")" ]; then
-  # we are in <repo root>/helpers
-  CHECK_BASE="$(pwd)/.."
-fi
+CHECK_BASE="$(dirname "$0")/.."
 
 if [ -n "$HTA_CHECK_BIN" ] && [ -f "$HTA_CHECK_BIN" ]; then
   # HTA_CHECK_BIN is set and exists, skip search
