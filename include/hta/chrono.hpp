@@ -61,6 +61,12 @@ struct Clock
             return time_since_epoch().count() != 0;
         }
     };
+    static time_point now()
+    {
+        return time_point(std::chrono::duration_cast<duration>(
+            std::chrono::system_clock::now().time_since_epoch()));
+    }
+
     static const bool is_steady = true;
 };
 

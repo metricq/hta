@@ -30,6 +30,7 @@
 #include "../storage/file/file.hpp"
 #include "../storage/file/metric.hpp"
 
+#include <hta/chrono.hpp>
 #include <hta/ostream.hpp>
 
 #include <boost/program_options.hpp>
@@ -41,32 +42,65 @@
 
 constexpr size_t chunk_size = 4096;
 
+// Heuristic values
+constexpr hta::Value value_min = -1e20;
+constexpr hta::Value value_max = 1e20;
+
+constexpr auto genesis =
+    hta::TimePoint(hta::Duration(946684800000000000ll)); // No metricq before 01.01.2000
+auto future = hta::Clock::now();
+
 namespace hta::storage::file
 {
-void check_raw(File<Metric::Header, TimeValue>& file)
+void check_raw(File<Metric::Header, TimeValue>& file, bool fast = false)
 {
     auto size = file.size();
     TimePoint previous_time;
     std::vector<TimeValue> data(chunk_size);
 
     size_t issue_count = 0;
-    for (size_t chunk_begin = 0; chunk_begin < size; chunk_begin += chunk_size)
+    size_t chunk_begin = 0;
+    if (fast && size > chunk_size)
+    {
+        chunk_begin = size - chunk_size;
+    }
+    for (; chunk_begin < size; chunk_begin += chunk_size)
     {
         data.resize(std::min(chunk_size, size - chunk_begin));
         file.read(data, chunk_begin);
         for (size_t index = 0; index < data.size(); index++)
         {
             auto tv = data[index];
+            auto absolute_index = chunk_begin + index;
+
+            if (!std::isfinite(tv.value))
+            {
+                std::cerr << "Warning: [" << absolute_index << "] Non-finite value " << tv.value
+                          << " at " << tv.time << std::endl;
+                issue_count++;
+            }
+            else if (tv.value < value_min)
+            {
+                std::cerr << "Warning: [" << absolute_index << "] Implausible value " << tv.value
+                          << " at " << tv.time << std::endl;
+                issue_count++;
+            }
+            else if (tv.value > value_max)
+            {
+                std::cerr << "Warning: [" << absolute_index << "] Implausible value: " << tv.value
+                          << " at " << tv.time << std::endl;
+                issue_count++;
+            }
 
             if (tv.time < previous_time)
             {
-                std::cout << "WARNING [" << (chunk_begin + index) << "] non-monotonous time "
-                          << tv.time << " follows " << previous_time << std::endl;
+                std::cerr << "Error: [" << absolute_index << "] non-monotonous time " << tv.time
+                          << " follows " << previous_time << std::endl;
                 issue_count++;
             }
             else if (tv.time == previous_time)
             {
-                std::cout << "WARNING [" << (chunk_begin + index) << "] duplicate time " << tv.time
+                std::cerr << "Error: [" << absolute_index << "] duplicate time " << tv.time
                           << std::endl;
                 issue_count++;
             }
@@ -74,27 +108,41 @@ void check_raw(File<Metric::Header, TimeValue>& file)
             {
                 previous_time = tv.time;
             }
-            if (!std::isfinite(tv.value))
-            {
-                std::cout << "WARNING [" << (chunk_begin + index) << "] non-finite value "
-                          << tv.value << " at " << tv.time << std::endl;
-                issue_count++;
-            }
         }
     }
-    std::cout << "Finished check of " << size << " entries: " << issue_count << " issues.";
+    std::cout << "Finished check of " << size << " entries: " << issue_count << " issues."
+              << std::endl;
 }
 
-void check_hta(File<Metric::Header, TimeAggregate>& file, Duration interval, TimePoint raw_epoch)
+void check_hta(File<Metric::Header, TimeAggregate>& file, Duration interval, TimePoint raw_epoch,
+               TimePoint raw_end, bool fast = false)
 {
     auto size = file.size();
     auto epoch = interval_begin(raw_epoch, interval);
 
     TimePoint previous_time;
-    std::vector<TimeAggregate> data(chunk_size);
+    std::vector<TimeAggregate> data;
+    data.reserve(chunk_size);
 
     size_t issue_count = 0;
-    for (size_t chunk_begin = 0; chunk_begin < size; chunk_begin += chunk_size)
+
+    // check last chunk consistency
+    data.resize(1);
+    file.read(data, size - 1);
+    if (data[0].time + interval != interval_begin(raw_end, interval))
+    {
+        std::cerr << "Error: Invalid last interval timestamp: " << data[0].time
+                  << ", expected: " << interval_begin(raw_end, interval) << ", raw_end: " << raw_end
+                  << ", interval: " << interval.count() << std::endl;
+        issue_count++;
+    }
+
+    size_t chunk_begin = 0;
+    if (fast && size > chunk_size)
+    {
+        chunk_begin = size - chunk_size;
+    }
+    for (; chunk_begin < size; chunk_begin += chunk_size)
     {
         data.resize(std::min(chunk_size, size - chunk_begin));
         file.read(data, chunk_begin);
@@ -106,72 +154,152 @@ void check_hta(File<Metric::Header, TimeAggregate>& file, Duration interval, Tim
             auto expected_time = epoch + interval * index;
             if (expected_time != ta.time)
             {
-                std::cout << "WARNING [" << index << "] bogus time, expected: " << expected_time
+                std::cerr << "Error: [" << index << "] bogus time, expected: " << expected_time
                           << ", actual: " << ta.time << std::endl;
                 issue_count++;
             }
             if (ta.time < previous_time)
             {
-                std::cout << "WARNING [" << index << "] non-monotonous time " << ta.time
+                std::cerr << "Error: [" << index << "] non-monotonous time " << ta.time
                           << " follows " << previous_time << std::endl;
                 issue_count++;
             }
             else if (ta.time == previous_time)
             {
-                std::cout << "WARNING [" << index << "] duplicate time " << ta.time << std::endl;
+                std::cerr << "Error: [" << index << "] duplicate time " << ta.time << std::endl;
                 issue_count++;
             }
             else
             {
                 previous_time = ta.time;
             }
+
             if (!std::isfinite(ta.aggregate.integral) || !std::isfinite(ta.aggregate.maximum) ||
                 !std::isfinite(ta.aggregate.minimum) || !std::isfinite(ta.aggregate.sum))
             {
-                std::cout << "WARNING [" << index << "] non-finite aggregate " << ta.aggregate
+                std::cerr << "Warning: [" << index << "] non-finite aggregate " << ta.aggregate
                           << " at " << ta.time << std::endl;
                 issue_count++;
             }
         }
     }
-    std::cout << "Finished check of " << size << " entries: " << issue_count << " issues.\n";
+    std::cout << "Finished check of " << size << " entries: " << issue_count << " issues."
+              << std::endl;
 }
 
-void check(const std::filesystem::path& dir)
+void check(const std::filesystem::path dir, bool fast = false)
 {
-    std::cout << "checking raw file" << std::endl;
-    File<Metric::Header, TimeValue> raw_file{ FileOpenTag::Read(),
-                                              dir / std::filesystem::path("raw.hta") };
+    std::cout << "[" << dir << "] Checking metric directory " << (fast ? " fast" : " full")
+              << std::endl;
+
+    auto raw_path = dir / std::filesystem::path("raw.hta");
+    std::cout << "[" << raw_path << "] Checking raw file" << std::endl;
+    File<Metric::Header, TimeValue> raw_file{ FileOpenTag::Read(), raw_path };
+
     if (raw_file.size() == 0)
     {
-        std::cout << "empty raw file";
+        std::cerr << "[" << raw_path << "] Error: empty raw file, aborting check." << std::endl;
         return;
     }
     auto raw_epoch = raw_file.read(0).time;
-    auto header = raw_file.header();
-    check_raw(raw_file);
-    for (auto interval = Duration(header.interval_min);; interval *= header.interval_factor)
+    auto raw_end = raw_file.read(raw_file.size() - 1).time;
+
+    if (raw_epoch > raw_end)
     {
-        std::filesystem::path filename = std::to_string(interval.count()) + ".hta";
-        std::cout << "checking file: " << filename << std::endl;
-        File<Metric::Header, TimeAggregate> hta_file{ FileOpenTag::Read(), dir / filename };
+        std::cerr << "[" << raw_path << "] Error: First after last raw timestamp: " << raw_epoch
+                  << ", " << raw_end << std::endl;
+    }
+
+    if (raw_epoch < genesis || raw_epoch > future)
+    {
+        std::cerr << "[" << raw_path << "] Error: Implausible first raw timestamp: " << raw_epoch
+                  << std::endl;
+    }
+
+    if (raw_end < genesis || raw_end > future)
+    {
+        std::cerr << "[" << raw_path << "] Error: Implausible first last timestamp." << raw_epoch
+                  << std::endl;
+    }
+
+    auto header = raw_file.header();
+    check_raw(raw_file, fast);
+
+    int expected_file_count = 1;
+
+    for (auto interval = Duration(header.interval_min); interval.count() <= header.interval_max;
+         interval *= header.interval_factor)
+    {
+
+        auto hta_path = dir / (std::to_string(interval.count()) + ".hta");
+        std::cout << "[" << hta_path << "] Checking HTA file" << std::endl;
+        expected_file_count++;
+        File<Metric::Header, TimeAggregate> hta_file{ FileOpenTag::Read(), hta_path };
         if (interval.count() != hta_file.header().interval)
         {
-            std::cout << "ERROR: " << filename << " mismatching interval: name: " << interval
-                      << ", header: " << hta_file.header().interval;
+            std::cerr << "[" << hta_path << "] Error: "
+                      << " mismatching interval: name: " << interval
+                      << ", header: " << hta_file.header().interval << std::endl;
         }
+
+        if (interval_begin(raw_epoch, interval) == interval_begin(raw_end, interval))
+        {
+            if (hta_file.size() != 0)
+            {
+                std::cerr << "Top HTA file should be empty but it is not." << std::endl;
+            }
+            break;
+        }
+
         // TODO Check interval factor/min
-        check_hta(hta_file, interval, raw_epoch);
+        check_hta(hta_file, interval, raw_epoch, raw_end, fast);
+    }
+
+    // check directory for number of files
+    auto actual_file_count = std::count_if(std::filesystem::directory_iterator(dir),
+                                           std::filesystem::directory_iterator(),
+                                           [](const auto& p) { return p.is_regular_file(); });
+    if (actual_file_count != expected_file_count)
+    {
+        std::cerr << "Error: Unexpected file count in directory, expected: " << expected_file_count
+                  << ", actual: " << actual_file_count << std::endl;
     }
 }
 } // namespace hta::storage::file
 
+namespace po = boost::program_options;
+
 int main(int argc, char* argv[])
 {
-    if (argc != 2)
+    bool fast = false;
+    std::vector<std::string> directories;
+    po::options_description desc("Check HTA databases for consistency");
+    desc.add_options()("fast", po::bool_switch(&fast), "check only the most recent data")(
+        "directory", po::value<std::vector<std::string>>(&directories));
+    po::positional_options_description p;
+    p.add("directory", -1);
+    try
     {
-        std::cerr << "missing argument (path)\n";
+        po::parsed_options parsed =
+            po::command_line_parser(argc, argv).options(desc).positional(p).run();
+        po::variables_map vm;
+        po::store(parsed, vm);
+        po::notify(vm);
+    }
+    catch (const std::exception& e)
+    {
+        std::cerr << "options error: " << e.what() << std::endl;
         return -1;
     }
-    hta::storage::file::check(argv[1]);
+    for (const auto& directory : directories)
+    {
+        try
+        {
+            hta::storage::file::check(directory, fast);
+        }
+        catch (const std::exception& e)
+        {
+            std::cerr << "[" << directory << "] Error: exception thrown: " << e.what() << std::endl;
+        }
+    }
 }
