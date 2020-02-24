@@ -30,6 +30,7 @@
 #include <hta/directory.hpp>
 #include <hta/filesystem.hpp>
 #include <hta/metric.hpp>
+#include <hta/ostream.hpp>
 
 #define CATCH_CONFIG_MAIN
 #include <catch/catch.hpp>
@@ -69,19 +70,23 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
     auto created = std::filesystem::create_directories(test_pwd);
     REQUIRE(created);
 
+    // clang-format off
     json config = {
         { "type", "file" },
         { "path", test_pwd },
-        { "metrics",
-          {
-              { "foo",
-                {
-                    { "interval_min", hta::duration_cast(std::chrono::seconds(10)).count() },
-                    { "interval_max", hta::duration_cast(std::chrono::seconds(1000)).count() },
-                    { "interval_factor", 10 },
-                } },
-          } },
+        {
+          "metrics", {
+            {
+              "foo", {
+                { "interval_min", hta::duration_cast(std::chrono::seconds(10)).count() },
+                { "interval_max", hta::duration_cast(std::chrono::seconds(1000)).count() },
+                { "interval_factor", 10 },
+              }
+            },
+          }
+        },
     };
+    // clang-format on
 
     auto config_path = test_pwd / "config.json";
     std::ofstream config_file;
@@ -484,6 +489,71 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
                 CHECK(result[2].value == -20.);
                 CHECK(result[3].time == tp(53s));
                 CHECK(result[3].value == -10.);
+            }
+        }
+
+        SECTION("smoothie selection")
+        {
+            auto begin = tp(42s);
+            auto end = tp(67s);
+
+            SECTION("Must be raw values")
+            {
+                auto tl = metric.retrieve_flex(begin, end, 1s,
+                                               { hta::Scope::open, hta::Scope::open }, false);
+
+                REQUIRE(hta::is_raw_timeline(tl));
+
+                const auto& result = hta::get_raw_timeline(tl);
+
+                CHECK(result.size() == 2);
+            }
+
+            SECTION("Must be raw values")
+            {
+                auto tl = metric.retrieve_flex(begin, end, 10s,
+                                               { hta::Scope::open, hta::Scope::open }, false);
+
+                REQUIRE(hta::is_aggregate_timeline(tl));
+
+                const auto& result = hta::get_aggregate_timeline(tl);
+
+                CHECK(result.size() == 2);
+            }
+
+            SECTION("Should be raw values")
+            {
+                auto tl = metric.retrieve_flex(begin, end, 1s,
+                                               { hta::Scope::open, hta::Scope::open }, true);
+
+                REQUIRE(hta::is_raw_timeline(tl));
+            }
+
+            SECTION("Should be smoothend values")
+            {
+                auto tl = metric.retrieve_flex(begin, end, 25s,
+                                               { hta::Scope::open, hta::Scope::open }, true);
+
+                REQUIRE(hta::is_aggregate_timeline(tl));
+
+                const auto& result = hta::get_aggregate_timeline(tl);
+
+                // check the smoothing in general
+                CHECK(result.size() == 1);
+                CHECK(result[0].time == tp(50s));
+                CHECK(10s < result[0].interval);
+                CHECK(result[0].interval <= 25s);
+
+                // check the smoothing result in prticular, this may need to be adapted for changes
+                // in the smoothing heuristic
+                auto& res = result[0];
+                CHECK(res.interval == 20s);
+                CHECK(res.aggregate.count == 2);
+                CHECK(res.aggregate.minimum == -10.);
+                CHECK(res.aggregate.maximum == 0.);
+                CHECK(res.aggregate.sum == -10.);
+                // -10 * 3sec from TS 53 & -10 * 3sec from TS 80
+                CHECK(res.aggregate.integral == -10. * hta::Duration(6s).count());
             }
         }
     }

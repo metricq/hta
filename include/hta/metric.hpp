@@ -39,8 +39,6 @@
 #include <map>
 #include <memory>
 #include <type_traits>
-#include <variant>
-#include <vector>
 
 namespace hta
 {
@@ -122,17 +120,16 @@ private: // common
 
 public: // read
     // infinity scopes are not supported here
-    std::vector<Row> retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
-                              IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
-    std::vector<Row> retrieve(TimePoint begin, TimePoint end, Duration interval_max,
-                              IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
-    std::vector<TimeValue> retrieve(TimePoint begin, TimePoint end,
-                                    IntervalScope scope = { Scope::closed, Scope::extended });
+    AggregateTimeline retrieve(TimePoint begin, TimePoint end, uint64_t min_samples,
+                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
+    AggregateTimeline retrieve(TimePoint begin, TimePoint end, Duration interval_max,
+                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open });
+    RawTimeline retrieve(TimePoint begin, TimePoint end,
+                         IntervalScope scope = { Scope::closed, Scope::extended });
     // TODO decide on proper name
-    std::variant<std::vector<Row>, std::vector<TimeValue>>
-    retrieve_flex(TimePoint begin, TimePoint end, Duration interval_max,
-                  IntervalScope scope = IntervalScope{ Scope::extended, Scope::open },
-                  bool smooth = true);
+    FlexTimeline retrieve_flex(TimePoint begin, TimePoint end, Duration interval_max,
+                               IntervalScope scope = IntervalScope{ Scope::extended, Scope::open },
+                               bool smooth = true);
     // technically this is IntervalScope{ Scope::closed, Scope::open } and used LAST semantics
     Aggregate aggregate(TimePoint begin, TimePoint end);
     size_t count(TimePoint begin, TimePoint end,
@@ -141,9 +138,9 @@ public: // read
     std::pair<TimePoint, TimePoint> range();
 
 private: // read
-    std::vector<Row> retrieve_raw_row(TimePoint begin, TimePoint end,
-                                      IntervalScope scope = IntervalScope{ Scope::closed,
-                                                                           Scope::extended });
+    AggregateTimeline retrieve_raw_row(TimePoint begin, TimePoint end,
+                                       IntervalScope scope = IntervalScope{ Scope::closed,
+                                                                            Scope::extended });
 
 public: // write
     void insert(TimeValue tv);

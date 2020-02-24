@@ -32,6 +32,8 @@
 #include "chrono.hpp"
 
 #include <limits>
+#include <variant>
+#include <vector>
 
 #include <cassert>
 
@@ -152,4 +154,49 @@ inline TimePoint interval_end(TimePoint time, Duration interval)
 {
     return interval_begin(time + interval, interval);
 }
+
+using RawTimeline = std::vector<TimeValue>;
+using AggregateTimeline = std::vector<Row>;
+using FlexTimeline = std::variant<AggregateTimeline, RawTimeline>;
+
+inline bool is_raw_timeline(const FlexTimeline& tl)
+{
+    return std::holds_alternative<RawTimeline>(tl);
+}
+
+inline const RawTimeline& get_raw_timeline(const FlexTimeline& tl)
+{
+    return std::get<RawTimeline>(tl);
+}
+
+inline RawTimeline& get_raw_timeline(FlexTimeline& tl)
+{
+    return std::get<RawTimeline>(tl);
+}
+
+inline RawTimeline get_raw_timeline(FlexTimeline&& tl)
+{
+    return std::get<RawTimeline>(std::move(tl));
+}
+
+inline bool is_aggregate_timeline(const FlexTimeline& tl)
+{
+    return std::holds_alternative<AggregateTimeline>(tl);
+}
+
+inline const AggregateTimeline& get_aggregate_timeline(const FlexTimeline& tl)
+{
+    return std::get<AggregateTimeline>(tl);
+}
+
+inline AggregateTimeline& get_aggregate_timeline(FlexTimeline& tl)
+{
+    return std::get<AggregateTimeline>(tl);
+}
+
+inline AggregateTimeline get_aggregate_timeline(FlexTimeline&& tl)
+{
+    return std::get<AggregateTimeline>(std::move(tl));
+}
+
 } // namespace hta
