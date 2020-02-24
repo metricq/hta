@@ -38,3 +38,29 @@ For long-running metrics with a sampling rate higher than once per second, we re
 With the recommended values for interval factor and interval min, the storage overhead for the aggregation of one metric is about 11 percent in comparison to the raw storage as a 128-bit timestamp-value pair list.
 
 For example, given a raw metric with a sampling rate of 1000 Samples per second, we'd recommend an interval min of `3e7 ns` and thus an interval max of `3e14 ns`. These settings result in an approximate data rate of 17.7 kB/s or about 560GB per year.
+
+Repairing corrupted database
+----------------------------
+
+### Finding corrupted metrics
+
+```hta_check``` checks a single metric for inconsistencies. With the option ```--fast``` the tool only checks the most recent data.
+
+The helper script ```check_db_directory.sh``` checks a whole database directory with many metrics. It utilizes GNU parallel to perform the check in parallel.
+
+```bash
+./helpers/check_db_directory.sh <path to the db> [<parallel jobs count>]
+```
+
+This script outputs a file containing all corrupted metrics.
+
+### Repairing corrupted metrics
+
+```hta_repair``` repairs a corrupted metric. It requires the path to corrupted metric as first argument.
+
+To repair metrics in parallel based on the file created by ```check_db_directory.sh``` run the following:
+
+```bash
+cat <output file of corrupted metrics> | parallel --load 100% --noswap --jobs <parallel jobs count> --results <folder for stdout and stderr of parallel programs> --eta <path to hta_repair, e.g. ./build/hta_repair> <path to db directory>/{}
+```
+
