@@ -42,4 +42,4 @@ ls "$1" | parallel --load 100% --noswap --jobs "$JOB_SLOTS" --results "$FILES_TO
 awk '{ print FILENAME, $0}' "$FILES_TO_REPAIR_DIR"/**/**/stderr > "$FILES_TO_REPAIR_TMP_FILE"
 cut -f1 -d " " "$FILES_TO_REPAIR_TMP_FILE" | sort -u | cut -f7 -d/ | grep -v -E ".*\.backup-[0-9]+$" > "$FILES_TO_REPAIR_FILE"
 
-rm -r "$FILES_TO_REPAIR_TMP_FILE"
+rm -r "$FILES_TO_REPAIR_DIR"
