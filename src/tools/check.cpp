@@ -218,7 +218,7 @@ void check(const std::filesystem::path dir, bool fast = false)
 
     if (raw_end < genesis || raw_end > future)
     {
-        std::cerr << "[" << raw_path << "] Error: Implausible first last timestamp." << raw_epoch
+        std::cerr << "[" << raw_path << "] Error: Implausible last raw timestamp: " << raw_end
                   << std::endl;
     }
 
