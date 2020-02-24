@@ -225,15 +225,12 @@ void check(const std::filesystem::path dir, bool fast = false)
     auto header = raw_file.header();
     check_raw(raw_file, fast);
 
-    int expected_file_count = 1;
-
     for (auto interval = Duration(header.interval_min); interval.count() <= header.interval_max;
          interval *= header.interval_factor)
     {
 
         auto hta_path = dir / (std::to_string(interval.count()) + ".hta");
         std::cout << "[" << hta_path << "] Checking HTA file" << std::endl;
-        expected_file_count++;
         File<Metric::Header, TimeAggregate> hta_file{ FileOpenTag::Read(), hta_path };
         if (interval.count() != hta_file.header().interval)
         {
@@ -253,16 +250,6 @@ void check(const std::filesystem::path dir, bool fast = false)
 
         // TODO Check interval factor/min
         check_hta(hta_file, interval, raw_epoch, raw_end, fast);
-    }
-
-    // check directory for number of files
-    auto actual_file_count = std::count_if(std::filesystem::directory_iterator(dir),
-                                           std::filesystem::directory_iterator(),
-                                           [](const auto& p) { return p.is_regular_file(); });
-    if (actual_file_count != expected_file_count)
-    {
-        std::cerr << "Error: Unexpected file count in directory, expected: " << expected_file_count
-                  << ", actual: " << actual_file_count << std::endl;
     }
 }
 } // namespace hta::storage::file
