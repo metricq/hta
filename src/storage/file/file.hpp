@@ -121,12 +121,14 @@ public:
     : File(filename, std::ios_base::in)
     {
         read_preamble();
+        check_size();
     }
 
     File(FileOpenTag::Write, const std::filesystem::path& filename, const HeaderType& header)
     : File(filename, std::ios_base::trunc | std::ios_base::out)
     {
         write_preamble(header);
+        check_size();
     }
 
     File(FileOpenTag::ReadWrite, const std::filesystem::path& filename, const HeaderType& header)
@@ -147,6 +149,7 @@ public:
             read_preamble();
             // TODO check compatibility of headers.
         }
+        check_size();
     }
 
     const HeaderType& header() const
@@ -178,6 +181,24 @@ public:
     {
         stream_.flush();
         check_stream("flush");
+    }
+
+    void check_size()
+    {
+        stream_.seekg(0, std::fstream::end);
+        check_stream("seekg to end for size");
+        auto data_end = stream_.tellg();
+        if (data_end < data_begin_)
+        {
+            throw_exception("File with negative data size: ", filename_, ", data_end: ", data_end,
+                            ", data_begin_: ", data_begin_);
+        }
+        auto size_bytes = data_end - data_begin_;
+        if (size_bytes % value_size != 0)
+        {
+            throw_exception("File with irregular data size: ", filename_,
+                            ", size in bytes: ", size_bytes, ", value_size: ", value_size);
+        }
     }
 
     size_type size()
@@ -286,11 +307,13 @@ private:
         }
     }
 
-    [[noreturn]] void raise_stream_error(const std::string& message) {
+    [[noreturn]] void raise_stream_error(const std::string& message)
+    {
         throw Exception(message, filename_, errno);
     }
 
-    private : std::filesystem::path filename_;
+private:
+    std::filesystem::path filename_;
     std::fstream stream_;
     // Apparently pos_type doesn't like to be constexpr m(
     static constexpr size_type header_begin_ =
