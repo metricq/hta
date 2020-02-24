@@ -74,7 +74,7 @@ int main(void)
 # check if we need to link an additional library
 check_cxx_source_compiles("${_CHECK_FILESYSTEM_CODE}" _HAS_INTEGRATED_STD_FILESYSTEM)
 
-# check if we the compiler can find the filesystem library of its stdlib by itself
+# check if the compiler can find the filesystem library of its stdlib by itself
 if(NOT _HAS_INTEGRATED_STD_FILESYSTEM)
     set(CMAKE_REQUIRED_LIBRARIES ${StdFSLibName})
     check_cxx_source_compiles("${_CHECK_FILESYSTEM_CODE}" _HAS_BUNDLED_FILESYSTEM_LIBRARY)
@@ -108,7 +108,7 @@ else()
         set(OUTPUT_MESSAGE "Using -l${StdFSLibName}")
     endif()
     find_package_handle_standard_args(StdFilesystem
-        "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and st andard library."
+        "Coudln't determine a proper setup for std::filesystem. Please use a fully C++17 compliant compiler and standard library."
         OUTPUT_MESSAGE
         HAS_STD_FILESYSTEM
     )
