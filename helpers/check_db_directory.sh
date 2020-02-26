@@ -36,6 +36,6 @@ echo "$FILES_TO_REPAIR_TMP_FILE contains all detected errors"
 ls "$1" | parallel --load 100% --noswap --jobs "$JOB_SLOTS" --results "$FILES_TO_REPAIR_DIR" --eta "$HTA_CHECK_BIN" --fast "$1"/{} > /dev/null
 
 awk '{ print FILENAME, $0}' "$FILES_TO_REPAIR_DIR"/**/**/stderr > "$FILES_TO_REPAIR_TMP_FILE"
-cut -f1 -d " " "$FILES_TO_REPAIR_TMP_FILE" | sort -u | cut -f7 -d/ | grep -v -E ".*\.backup-[0-9]+$" > "$FILES_TO_REPAIR_FILE"
+cut -f1 -d " " "$FILES_TO_REPAIR_TMP_FILE" | sort -u | awk 'BEGIN { FS = "/"; getline; for (i = 1; i <= NF; i++) { if ($i == "'"$(basename $FILES_TO_REPAIR_DIR)"'") { i= i+2; if ($i !~ /\.backup-[0-9]+$/) { print $i }  break }} if (i > NF) exit }; $i !~   /\.backup-[0-9]+$/ {print $i}' > "$FILES_TO_REPAIR_FILE"
 
 rm -r "$FILES_TO_REPAIR_DIR"
