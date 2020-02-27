@@ -198,7 +198,7 @@ void check(const std::filesystem::path dir, bool fast = false)
 
     if (raw_file.size() == 0)
     {
-        std::cerr << "[" << raw_path << "] Error: empty raw file, aborting check." << std::endl;
+        std::cout << "[" << raw_path << "] Warning: empty raw file, aborting check." << std::endl;
         return;
     }
     auto raw_epoch = raw_file.read(0).time;
