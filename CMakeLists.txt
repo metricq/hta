@@ -60,6 +60,9 @@ if(Boost_FOUND)
 
     add_executable(hta_throttle src/tools/throttle.cpp)
     target_link_libraries(hta_throttle PRIVATE hta::hta)
+
+    add_executable(hta_clone src/tools/clone.cpp)
+    target_link_libraries(hta_clone PRIVATE hta::hta)
 else()
     message(STATUS "Will not build hta_dummy, hta_dump, hta_throttle missing boost")
 endif()
