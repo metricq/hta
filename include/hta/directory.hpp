@@ -62,6 +62,8 @@ public:
     std::vector<std::string> metric_names();
 
     Metric& operator[](const std::string& name);
+    // For metrics only, not prefixes
+    std::pair<Metric&, bool> emplace(const std::string& name, const json& config);
 
 private:
     Metric make_metric(const std::string& name, const json& config);

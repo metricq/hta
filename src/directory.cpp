@@ -98,34 +98,24 @@ Directory::Directory(const json& config, bool use_mutex) : mutex_(use_mutex)
     if (config.count("metrics"))
     {
         auto& metrics = config.at("metrics");
-        if (metrics.is_array())
+        assert(metrics.is_object());
+        for (const auto& elem : metrics.items())
         {
-            // Legacy, TODO remove, doesn't support prefixes!
-            for (const auto& metric_config : metrics)
+            std::string name = elem.key();
+            const auto& metric_config = elem.value();
+            if (metric_config.count("prefix") && metric_config.at("prefix").get<bool>())
             {
-                auto name = metric_config.at("name").get<std::string>();
-                metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                 std::forward_as_tuple(make_metric(name, metric_config)));
+                // TODO check for overlapping prefixes
+                // add . to end
+                prefixes_.emplace_back(name + ".", metric_config);
             }
-        }
-        else
-        {
-            assert(metrics.is_object());
-            for (const auto& elem : metrics.items())
+            else
             {
-                std::string name = elem.key();
-                const auto& metric_config = elem.value();
-
-                if (metric_config.count("prefix") && metric_config.at("prefix").get<bool>())
+                const auto& [metric, inserted] = emplace(name, metric_config);
+                (void)metric;
+                if (!inserted)
                 {
-                    // add . to end
-                    name += ".";
-                    prefixes_.emplace_back(name, metric_config);
-                }
-                else
-                {
-                    metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
-                                     std::forward_as_tuple(make_metric(name, metric_config)));
+                    throw_exception("duplicated metric name in initial configuration: ", name);
                 }
             }
         }
@@ -142,15 +132,27 @@ std::vector<std::string> Directory::metric_names()
     return directory_->metric_names();
 }
 
+std::pair<Metric&, bool> Directory::emplace(const std::string& name, const json& config)
+{
+    std::lock_guard<OptionalMutex> guard(mutex_);
+
+    auto [it, inserted] = metrics_.emplace(std::piecewise_construct, std::forward_as_tuple(name),
+                                           std::forward_as_tuple(make_metric(name, config)));
+    (void)it;
+    if (!inserted)
+    {
+        throw std::runtime_error("emplacing a metric that is already contained in a Directory "
+                                 "is currently not supported");
+    }
+    return { it->second, inserted };
+}
+
 Metric& Directory::operator[](const std::string& name)
 {
+    std::lock_guard<OptionalMutex> guard(mutex_);
+    if (auto it = metrics_.find(name); it != metrics_.end())
     {
-        std::lock_guard<OptionalMutex> guard(mutex_);
-        auto it = metrics_.find(name);
-        if (it != metrics_.end())
-        {
-            return it->second;
-        }
+        return it->second;
     }
     for (const auto& elem : prefixes_)
     {
@@ -159,7 +161,6 @@ Metric& Directory::operator[](const std::string& name)
         {
             Metric metric = make_metric(name, elem.second);
             {
-                std::lock_guard<OptionalMutex> guard(mutex_);
                 auto it = metrics_.emplace(name, std::move(metric));
                 assert(it.second);
                 return it.first->second;
