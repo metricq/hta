@@ -67,6 +67,19 @@ else()
     message(STATUS "Will not build hta_dummy, hta_dump, hta_throttle missing boost")
 endif()
 
+# Seems like I can't find_package for it if not installed.
+# So we only find_package if requested
+option(USE_S3 "Enable S3 support." OFF)
+
+if (USE_S3)
+    find_package(AWSSDK REQUIRED COMPONENTS s3)
+    target_compile_definitions(hta PUBLIC HAVE_S3)
+    target_link_libraries(hta ${AWSSDK_LINK_LIBRARIES})
+    target_sources(hta PRIVATE
+    )
+endif()
+
+
 if(CMAKE_CURRENT_SOURCE_DIR STREQUAL CMAKE_SOURCE_DIR)
     target_compile_options(hta
         PUBLIC
