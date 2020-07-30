@@ -74,8 +74,10 @@ option(USE_S3 "Enable S3 support." OFF)
 if (USE_S3)
     find_package(AWSSDK REQUIRED COMPONENTS s3)
     target_compile_definitions(hta PUBLIC HAVE_S3)
-    target_link_libraries(hta ${AWSSDK_LINK_LIBRARIES})
+    target_link_libraries(hta PUBLIC ${AWSSDK_LINK_LIBRARIES})
     target_sources(hta PRIVATE
+        src/storage/s3/directory.cpp
+        src/storage/s3/metric.cpp
     )
 endif()
 
