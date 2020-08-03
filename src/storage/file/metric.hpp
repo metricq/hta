@@ -121,7 +121,7 @@ public:
 
     void flush() override;
 
-    std::vector<TimeValue> get(TimePoint begin, TimePoint ebd, IntervalScope scope) override;
+    std::vector<TimeValue> get(TimePoint begin, TimePoint end, IntervalScope scope) override;
     std::vector<TimeAggregate> get(TimePoint begin, TimePoint end, Duration interval,
                                    IntervalScope scope) override;
 
