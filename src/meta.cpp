@@ -51,6 +51,10 @@ Meta::Meta(const json& config)
     {
         interval_max = Duration(config["interval_max"]);
     }
+    if (interval_factor <= 1)
+    {
+        throw_exception("interval_factor is not greater than 1: ", interval_factor);
+    }
     if (interval_min.count() % interval_factor != 0)
     {
         throw_exception("interval_min of ", interval_min, " not divisible by ", interval_factor);
