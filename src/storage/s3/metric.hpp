@@ -31,9 +31,64 @@
 
 #include "../metric.hpp"
 
+#include <hta/meta.hpp>
+
+#include <aws/s3/S3Client.h>
+
+#include <memory>
+
 namespace hta::storage::s3
 {
 class Metric : public storage::Metric
 {
+public:
+    /**
+     * @param open_mode
+     * @param client
+     * @param bucket_name
+     * @param raw_chunk_size number of elements of type TimeValue in each s3 object (NOT bytes)
+     * @param hta_chunk_size number of elements of type TimeAggregate in each s3 object (NOT bytes)
+     */
+    Metric(Mode open_mode, Aws::S3::S3Client& client, const std::string& bucket_name,
+           std::size_t raw_writer_buffer_size, std::size_t hta_chunk_size);
+
+    Meta meta() const override;
+    Mode mode() const override;
+
+    void insert(TimeValue tv) override;
+    void insert(Row row) override;
+
+    void flush() override;
+
+    std::vector<TimeValue> get(TimePoint begin, TimePoint end, IntervalScope scope) override;
+    std::vector<TimeAggregate> get(TimePoint begin, TimePoint end, Duration interval,
+                                   IntervalScope scope) override;
+
+    size_t count(TimePoint begin, TimePoint end, IntervalScope scope) override;
+
+    TimeValue last() override;
+    TimeAggregate last(Duration interval) override;
+    std::pair<TimePoint, TimePoint> range() override;
+
+    std::size_t size() override;
+    std::size_t size(Duration interval) override;
+
+private:
+    // I thought constexpr std::string was C++20. Is it not?
+    // Doesn't work with gcc 10.1.0 or clang 10.0.1
+    static constexpr char meta_key_[] = "meta";
+
+private:
+    Mode mode_;
+    Meta meta_;
+
+    Aws::S3::S3Client& client_;
+    std::string bucket_name_;
+    size_t hta_buffer_size_;
+    std::vector<TimeValue> raw_write_buffer_;
+    std::map<Duration, std::vector<TimeAggregate>> hta_write_buffers_;
+
+    std::map<TimePoint, std::vector<TimeValue>> raw_read_buffer_;
+    std::map<Duration, std::map<TimePoint, std::vector<TimeAggregate>>> hta_read_buffers_;
 };
 } // namespace hta::storage::s3

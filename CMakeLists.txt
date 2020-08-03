@@ -34,7 +34,7 @@ target_link_libraries(hta
         std::filesystem
 )
 
-target_compile_features(hta PUBLIC cxx_std_17)
+target_compile_features(hta PUBLIC cxx_std_20)
 
 target_compile_options(hta
     PRIVATE
@@ -76,8 +76,8 @@ if (USE_S3)
     target_compile_definitions(hta PUBLIC HAVE_S3)
     target_link_libraries(hta PUBLIC ${AWSSDK_LINK_LIBRARIES})
     target_sources(hta PRIVATE
-        src/storage/s3/directory.cpp
-        src/storage/s3/metric.cpp
+        #src/storage/s3/directory.cpp
+        #src/storage/s3/metric.cpp
     )
 endif()
 

@@ -31,3 +31,15 @@
 
 #include "../directory.hpp"
 #include "metric.hpp"
+
+#include <aws/s3/S3Client.h>
+
+namespace hta::storage::s3
+{
+class Directory : public storage::Directory
+{
+public:
+private:
+    Aws::S3::S3Client client_;
+};
+} // namespace hta::storage::s3
