@@ -99,7 +99,8 @@ private:
     static constexpr std::array<char, 8> magic_bytes = { 'H',        'T',  'A',        0x1a,
                                                          char(0xc5), 0x2c, char(0xcc), 0x1d };
     static constexpr uint64_t byte_order_mark = 0xf8f9fafbfcfdfeff;
-    static_assert(std::is_pod_v<HeaderType>, "HeaderType must be a POD.");
+    static_assert(std::is_standard_layout_v<HeaderType>, "HeaderType must be a POD.");
+    static_assert(std::is_trivial_v<HeaderType>, "HeaderType must be a POD.");
 
 public:
     using pos_type = std::fstream::pos_type;
