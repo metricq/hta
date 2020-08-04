@@ -16,6 +16,7 @@
 #include <chrono>
 #include <iostream>
 #include <random>
+#include <streambuf>
 #include <vector>
 
 template <class T>
@@ -93,7 +94,6 @@ public:
     void TearDown([[maybe_unused]] benchmark::State& st) override
     {
         //        std::cout << "S3WriteFixture::TearDown" << std::endl;
-
         assert(st.range(0) == int64_t(data.size()));
         auto r = client.DeleteObject(
             Aws::S3::Model::DeleteObjectRequest().WithKey(key).WithBucket(bucket));
@@ -108,21 +108,6 @@ public:
     std::normal_distribution<> r_dist{ 140, 50 };
 
     std::vector<T> data;
-};
-
-template <class T>
-class S3ReadFixture : public S3WriteFixture<T>
-{
-public:
-    S3ReadFixture()
-    {
-    }
-
-    void SetUp(benchmark::State& st) override
-    {
-        S3WriteFixture<T>::SetUp(st);
-        // TODO Write
-    }
 };
 
 template <class T>
@@ -146,22 +131,185 @@ void write_stringstream(S3WriteFixture<T>& f, benchmark::State& st)
     auto o = f.client.PutObject(request);
     if (!o.IsSuccess())
     {
-        std::cerr << "Error writing object: " << o.GetError().GetMessage() << "\n";
+        auto err = o.GetError();
+        std::cerr << "Error writing object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
         throw std::runtime_error("S3 error");
     }
 
     st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
-BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteTimeValue, hta::TimeValue)(benchmark::State& st)
+// Evil functions are inspired by https://github.com/aws/aws-sdk-cpp/issues/64
+// Apparently there is no proper way to get/put from S3 with zero copy.
+template <class T>
+void write_evil(S3WriteFixture<T>& f, benchmark::State& st)
+{
+    // Q: Why the fuck is this a shared pointer to a stream?
+    // A: Because request.SetBody only accepts shared pointers.
+    auto data_stream = Aws::MakeShared<Aws::StringStream>("PleaseBeNiceToMe");
+
+    // Not the greatest moment in programming history.
+
+    auto bytes = f.data.size() * sizeof(typename decltype(f.data)::value_type);
+    data_stream->rdbuf()->pubsetbuf(reinterpret_cast<char*>(f.data.data()), bytes);
+    data_stream->rdbuf()->pubseekpos(bytes);
+    data_stream->seekg(0);
+
+    Aws::S3::Model::PutObjectRequest request;
+    request.SetBucket(f.bucket);
+    request.SetKey(f.key);
+    request.SetBody(data_stream);
+
+    //    std::cout << "writing " << bytes << " bytes to object " << f.key << "@" << f.bucket
+    //              << std::endl;
+
+    auto o = f.client.PutObject(request);
+    if (!o.IsSuccess())
+    {
+        auto err = o.GetError();
+        std::cerr << "Error writing object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
+        throw std::runtime_error("S3 error");
+    }
+
+    st.SetBytesProcessed(bytes + st.bytes_processed());
+}
+
+template <class T>
+class S3ReadFixture : public S3WriteFixture<T>
+{
+public:
+    S3ReadFixture()
+    {
+    }
+
+    void SetUp(benchmark::State& st) override
+    {
+        S3WriteFixture<T>::SetUp(st);
+        write_stringstream(*this, st);
+        read_data.resize(st.range(0));
+    }
+
+    void check() const
+    {
+        if (read_data != this->data)
+        {
+            std::cerr << "read data does not match original\n";
+            throw std::runtime_error("data does not match");
+        }
+    }
+
+    std::vector<T> read_data;
+};
+
+template <class T>
+void read_seek(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
+{
+    Aws::S3::Model::GetObjectOutcome get_object_outcome =
+        f.client.GetObject(Aws::S3::Model::GetObjectRequest().WithBucket(f.bucket).WithKey(f.key));
+
+    if (!get_object_outcome.IsSuccess())
+    {
+        auto err = get_object_outcome.GetError();
+        std::cerr << "Error reading object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
+        throw std::runtime_error("S3 error");
+    }
+    auto& retrieved_file = get_object_outcome.GetResultWithOwnership().GetBody();
+
+    retrieved_file.seekg(0, std::ios::end);
+    auto expected_bytes = f.data.size() * sizeof(typename decltype(f.data)::value_type);
+    auto bytes = std::size_t(retrieved_file.tellg());
+    if (bytes != expected_bytes)
+    {
+        std::cerr << "object has wrong size, expected: " << expected_bytes << ", actual: " << bytes
+                  << std::endl;
+        throw std::runtime_error("S3 size error");
+    }
+    retrieved_file.seekg(0, std::ios::beg);
+    retrieved_file.read(reinterpret_cast<char*>(f.read_data.data()), bytes);
+    f.check();
+}
+
+template <class T>
+void read_evil(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
+{
+    auto expected_bytes = f.data.size() * sizeof(typename decltype(f.data)::value_type);
+
+    Aws::S3::Model::GetObjectRequest request;
+    request.SetBucket(f.bucket);
+    request.SetKey(f.key);
+    // Maybe it will like me better if I lie?
+    request.SetResponseStreamFactory([&f, expected_bytes]() {
+        std::unique_ptr<Aws::StringStream> stream(
+            Aws::New<Aws::StringStream>("S3TheBestInterfaceInTheWorld"));
+        stream->rdbuf()->pubsetbuf(reinterpret_cast<char*>(f.read_data.data()), expected_bytes);
+        return stream.release();
+    });
+    Aws::S3::Model::GetObjectOutcome get_object_outcome = f.client.GetObject(request);
+    if (!get_object_outcome.IsSuccess())
+    {
+        auto err = get_object_outcome.GetError();
+        std::cerr << "Error reading object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
+        throw std::runtime_error("S3 error");
+    }
+
+    f.check();
+}
+
+BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadSeekTimeValue, hta::TimeValue)(benchmark::State& st)
+{
+    for (auto _ : st)
+    {
+        read_seek(*this, st);
+    }
+}
+BENCHMARK_REGISTER_F(S3ReadFixture, ReadSeekTimeValue)
+    ->UseRealTime()
+    ->MeasureProcessCPUTime()
+    ->RangeMultiplier(2)
+    ->Range(1ll, 1ll << 20);
+
+BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadEvilTimeValue, hta::TimeValue)(benchmark::State& st)
+{
+    for (auto _ : st)
+    {
+        read_evil(*this, st);
+    }
+}
+BENCHMARK_REGISTER_F(S3ReadFixture, ReadEvilTimeValue)
+    ->UseRealTime()
+    ->MeasureProcessCPUTime()
+    ->RangeMultiplier(2)
+    ->Range(1ll, 1ll << 20);
+
+BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteStringStreamTimeValue, hta::TimeValue)
+(benchmark::State& st)
 {
     for (auto _ : st)
     {
         write_stringstream(*this, st);
     }
 }
-BENCHMARK_REGISTER_F(S3WriteFixture, WriteTimeValue)
+BENCHMARK_REGISTER_F(S3WriteFixture, WriteStringStreamTimeValue)
     ->UseRealTime()
+    ->MeasureProcessCPUTime()
+    ->RangeMultiplier(2)
+    ->Range(1ll, 1ll << 20);
+
+BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteEvilTimeValue, hta::TimeValue)
+(benchmark::State& st)
+{
+    for (auto _ : st)
+    {
+        write_evil(*this, st);
+    }
+}
+BENCHMARK_REGISTER_F(S3WriteFixture, WriteEvilTimeValue)
+    ->UseRealTime()
+    ->MeasureProcessCPUTime()
     ->RangeMultiplier(2)
     ->Range(1ll, 1ll << 20);
 
