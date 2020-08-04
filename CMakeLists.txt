@@ -8,9 +8,7 @@ include(cmake/DefaultBuildType.cmake)
 
 find_package(StdFilesystem REQUIRED)
 
-
-add_subdirectory(lib/catch)
-add_subdirectory(lib/json)
+add_subdirectory(lib)
 
 set(hta_VERSION 0.0)
 
