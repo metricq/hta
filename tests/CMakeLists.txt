@@ -55,8 +55,15 @@ if (benchmark_FOUND)
     target_link_libraries(hta.bench PRIVATE hta::hta json::json benchmark::benchmark)
 
     if (USE_S3)
-        add_executable(hta.bench_s3 bench_s3.cpp)
-        target_link_libraries(hta.bench_s3 PRIVATE hta::hta json::json benchmark::benchmark ${AWSSDK_LINK_LIBRARIES})
+        add_executable(hta.bench_s3 bench_s3.cpp ../src/storage/s3/init.hpp)
+        target_link_libraries(hta.bench_s3
+            PRIVATE
+                hta::hta
+                json::json
+                benchmark::benchmark
+                ${AWSSDK_LINK_LIBRARIES}
+                Nitro::env
+        )
     endif()
 else ()
     message(STATUS "Looking for google benchmark - not found, skipping benchmark tests.")
