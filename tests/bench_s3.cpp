@@ -191,10 +191,9 @@ void write_preallocatedstreambuff(S3WriteFixture<T>& f, benchmark::State& st)
     assert(int64_t(f.write_buffer().GetLength()) == st.range(0));
     auto bytes = f.write_buffer().GetLength() * sizeof(T);
 
-    auto streamBuf = Aws::New<Aws::Utils::Stream::PreallocatedStreamBuf>(
-        "UselessTag", reinterpret_cast<unsigned char*>(f.write_buffer().GetUnderlyingData()),
-        f.write_buffer().GetLength());
-    auto preallocated_stream = Aws::MakeShared<Aws::IOStream>("MoreUselessTags", streamBuf);
+    Aws::Utils::Stream::PreallocatedStreamBuf streambuf(
+        reinterpret_cast<unsigned char*>(f.write_buffer().GetUnderlyingData()), bytes);
+    auto preallocated_stream = Aws::MakeShared<Aws::IOStream>("", &streambuf);
 
     Aws::S3::Model::PutObjectRequest request;
     request.SetBucket(f.bucket);
@@ -313,6 +312,38 @@ void read_evil(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
     }
 }
 
+template <class T>
+void read_preallocatedstreambuf(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
+{
+    assert(f.read_buffer().GetLength() == std::size_t(st.range(0)));
+
+    auto bytes = f.read_buffer().GetLength() * sizeof(T);
+    Aws::Utils::Stream::PreallocatedStreamBuf streambuf(
+        reinterpret_cast<unsigned char*>(f.write_buffer().GetUnderlyingData()), bytes);
+    Aws::S3::Model::GetObjectRequest request;
+    request.SetBucket(f.bucket);
+    request.SetKey(f.key());
+
+    request.SetResponseStreamFactory([&f, bytes, &streambuf]() {
+        std::unique_ptr<Aws::IOStream> stream(Aws::New<Aws::IOStream>("", &streambuf));
+        stream->rdbuf()->pubsetbuf(reinterpret_cast<char*>(f.read_buffer().GetUnderlyingData()),
+                                   bytes);
+        return stream.release();
+    });
+    Aws::S3::Model::GetObjectOutcome get_object_outcome = f.client.GetObject(request);
+    if (!get_object_outcome.IsSuccess())
+    {
+        auto err = get_object_outcome.GetError();
+        std::cerr << "Error reading object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
+        throw std::runtime_error("S3 error");
+    }
+}
+
+constexpr auto range_multiplier = 2;
+constexpr auto range_min = 1ll;
+constexpr auto range_max = 1ll << 23;
+
 BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadSeekTimeValue, hta::TimeValue)(benchmark::State& st)
 {
     for (auto _ : st)
@@ -324,8 +355,8 @@ BENCHMARK_REGISTER_F(S3ReadFixture, ReadSeekTimeValue)
     ->UseRealTime()
     ->MeasureProcessCPUTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(2)
-    ->Range(1ll, 1ll << 20);
+    ->RangeMultiplier(range_multiplier)
+    ->Range(range_min, range_max);
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadEvilTimeValue, hta::TimeValue)(benchmark::State& st)
 {
@@ -338,8 +369,23 @@ BENCHMARK_REGISTER_F(S3ReadFixture, ReadEvilTimeValue)
     ->UseRealTime()
     ->MeasureProcessCPUTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(2)
-    ->Range(1ll, 1ll << 20);
+    ->RangeMultiplier(range_multiplier)
+    ->Range(range_min, range_max);
+
+BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadPreallocTimeValue, hta::TimeValue)
+(benchmark::State& st)
+{
+    for (auto _ : st)
+    {
+        read_preallocatedstreambuf(*this, st);
+    }
+}
+BENCHMARK_REGISTER_F(S3ReadFixture, ReadPreallocTimeValue)
+    ->UseRealTime()
+    ->MeasureProcessCPUTime()
+    ->Unit(benchmark::kMillisecond)
+    ->RangeMultiplier(range_multiplier)
+    ->Range(range_min, range_max);
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteStringStreamTimeValue, hta::TimeValue)
 (benchmark::State& st)
@@ -353,8 +399,8 @@ BENCHMARK_REGISTER_F(S3WriteFixture, WriteStringStreamTimeValue)
     ->UseRealTime()
     ->MeasureProcessCPUTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(2)
-    ->Range(1ll, 1ll << 20);
+    ->RangeMultiplier(range_multiplier)
+    ->Range(range_min, range_max);
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteEvilTimeValue, hta::TimeValue)
 (benchmark::State& st)
@@ -368,8 +414,8 @@ BENCHMARK_REGISTER_F(S3WriteFixture, WriteEvilTimeValue)
     ->UseRealTime()
     ->MeasureProcessCPUTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(2)
-    ->Range(1ll, 1ll << 20);
+    ->RangeMultiplier(range_multiplier)
+    ->Range(range_min, range_max);
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WritePreallocTimeValue, hta::TimeValue)
 (benchmark::State& st)
@@ -383,7 +429,7 @@ BENCHMARK_REGISTER_F(S3WriteFixture, WritePreallocTimeValue)
     ->UseRealTime()
     ->MeasureProcessCPUTime()
     ->Unit(benchmark::kMillisecond)
-    ->RangeMultiplier(2)
-    ->Range(1ll, 1ll << 20);
+    ->RangeMultiplier(range_multiplier)
+    ->Range(range_min, range_max);
 
 BENCHMARK_MAIN();
