@@ -3,6 +3,7 @@
 #include <hta/hta.hpp>
 
 #include <aws/core/utils/Array.h>
+#include <aws/core/utils/memory/AWSMemory.h>
 #include <aws/core/utils/stream/PreallocatedStreamBuf.h>
 #include <aws/s3/S3Client.h>
 #include <aws/s3/model/DeleteObjectRequest.h>
@@ -26,6 +27,21 @@ static std::string key_prefix =
                        std::chrono::system_clock::now().time_since_epoch())
                        .count());
 static int key_count = 0;
+
+class PreallocatedIOStream : public Aws::IOStream
+{
+public:
+    PreallocatedIOStream(std::byte* memory, std::size_t size)
+    : Aws::IOStream(new Aws::Utils::Stream::PreallocatedStreamBuf(
+          reinterpret_cast<unsigned char*>(memory), size))
+    {
+    }
+
+    ~PreallocatedIOStream()
+    {
+        delete rdbuf();
+    }
+};
 
 template <class T>
 class S3WriteFixture : public benchmark::Fixture
@@ -186,14 +202,13 @@ void write_evil(S3WriteFixture<T>& f, benchmark::State& st)
 // This is why we need to endure Aws::Array
 // https://github.com/aws/aws-sdk-cpp/issues/785
 template <class T>
-void write_preallocatedstreambuff(S3WriteFixture<T>& f, benchmark::State& st)
+void write_preallocatedstreambuf(S3WriteFixture<T>& f, benchmark::State& st)
 {
     assert(int64_t(f.write_buffer().GetLength()) == st.range(0));
     auto bytes = f.write_buffer().GetLength() * sizeof(T);
 
-    Aws::Utils::Stream::PreallocatedStreamBuf streambuf(
-        reinterpret_cast<unsigned char*>(f.write_buffer().GetUnderlyingData()), bytes);
-    auto preallocated_stream = Aws::MakeShared<Aws::IOStream>("", &streambuf);
+    auto preallocated_stream = Aws::MakeShared<PreallocatedIOStream>(
+        "", reinterpret_cast<std::byte*>(f.write_buffer().GetUnderlyingData()), bytes);
 
     Aws::S3::Model::PutObjectRequest request;
     request.SetBucket(f.bucket);
@@ -232,11 +247,13 @@ public:
 
     void TearDown([[maybe_unused]] benchmark::State& st) override
     {
+        // Checking just once for now so it doesn't impact performance
+        check();
         read_buffer_.reset();
         S3WriteFixture<T>::TearDown(st);
     }
 
-    void check() const
+    void check()
     {
         if (read_buffer() != this->write_buffer())
         {
@@ -282,6 +299,8 @@ void read_seek(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
     }
     retrieved_file.seekg(0, std::ios::beg);
     retrieved_file.read(reinterpret_cast<char*>(f.read_buffer().GetUnderlyingData()), bytes);
+
+    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 template <class T>
@@ -289,43 +308,15 @@ void read_evil(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
 {
     assert(f.read_buffer().GetLength() == std::size_t(st.range(0)));
 
-    auto expected_bytes = f.read_buffer().GetLength() * sizeof(T);
+    auto bytes = f.read_buffer().GetLength() * sizeof(T);
 
     Aws::S3::Model::GetObjectRequest request;
     request.SetBucket(f.bucket);
     request.SetKey(f.key());
     // Maybe it will like me better if I lie?
-    request.SetResponseStreamFactory([&f, expected_bytes]() {
+    request.SetResponseStreamFactory([&f, bytes]() {
         std::unique_ptr<Aws::StringStream> stream(
             Aws::New<Aws::StringStream>("S3TheBestInterfaceInTheWorld"));
-        stream->rdbuf()->pubsetbuf(reinterpret_cast<char*>(f.read_buffer().GetUnderlyingData()),
-                                   expected_bytes);
-        return stream.release();
-    });
-    Aws::S3::Model::GetObjectOutcome get_object_outcome = f.client.GetObject(request);
-    if (!get_object_outcome.IsSuccess())
-    {
-        auto err = get_object_outcome.GetError();
-        std::cerr << "Error reading object: " << err.GetExceptionName() << ": " << err.GetMessage()
-                  << std::endl;
-        throw std::runtime_error("S3 error");
-    }
-}
-
-template <class T>
-void read_preallocatedstreambuf(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
-{
-    assert(f.read_buffer().GetLength() == std::size_t(st.range(0)));
-
-    auto bytes = f.read_buffer().GetLength() * sizeof(T);
-    Aws::Utils::Stream::PreallocatedStreamBuf streambuf(
-        reinterpret_cast<unsigned char*>(f.write_buffer().GetUnderlyingData()), bytes);
-    Aws::S3::Model::GetObjectRequest request;
-    request.SetBucket(f.bucket);
-    request.SetKey(f.key());
-
-    request.SetResponseStreamFactory([&f, bytes, &streambuf]() {
-        std::unique_ptr<Aws::IOStream> stream(Aws::New<Aws::IOStream>("", &streambuf));
         stream->rdbuf()->pubsetbuf(reinterpret_cast<char*>(f.read_buffer().GetUnderlyingData()),
                                    bytes);
         return stream.release();
@@ -338,11 +329,121 @@ void read_preallocatedstreambuf(S3ReadFixture<T>& f, [[maybe_unused]] benchmark:
                   << std::endl;
         throw std::runtime_error("S3 error");
     }
+
+    st.SetBytesProcessed(bytes + st.bytes_processed());
+}
+
+template <class T>
+void read_preallocatedstreambuf(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
+{
+    assert(f.read_buffer().GetLength() == std::size_t(st.range(0)));
+
+    auto bytes = f.read_buffer().GetLength() * sizeof(T);
+    Aws::S3::Model::GetObjectRequest request;
+    request.SetBucket(f.bucket);
+    request.SetKey(f.key());
+
+    request.SetResponseStreamFactory([&f, bytes]() {
+        return Aws::New<PreallocatedIOStream>(
+            "", reinterpret_cast<std::byte*>(f.read_buffer().GetUnderlyingData()), bytes);
+    });
+    Aws::S3::Model::GetObjectOutcome get_object_outcome = f.client.GetObject(request);
+    if (!get_object_outcome.IsSuccess())
+    {
+        auto err = get_object_outcome.GetError();
+        std::cerr << "Error reading object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
+        throw std::runtime_error("S3 error");
+    }
+
+    st.SetBytesProcessed(bytes + st.bytes_processed());
+}
+
+template <class T>
+class S3ReadRangeFixture : public S3WriteFixture<T>
+{
+public:
+    S3ReadRangeFixture()
+    {
+    }
+
+    void SetUp(benchmark::State& st) override
+    {
+        S3WriteFixture<T>::SetUp(st);
+        write_stringstream(*this, st);
+        read_buffer_ = std::make_unique<Aws::Utils::Array<T>>(st.range(1));
+    }
+
+    void TearDown([[maybe_unused]] benchmark::State& st) override
+    {
+        read_buffer_.reset();
+        S3WriteFixture<T>::TearDown(st);
+    }
+
+    Aws::Utils::Array<T>& read_buffer()
+    {
+        return *read_buffer_;
+    }
+
+private:
+    std::unique_ptr<Aws::Utils::Array<T>> read_buffer_;
+};
+
+template <class T>
+void read_range(S3ReadRangeFixture<T>& f, [[maybe_unused]] benchmark::State& st)
+{
+    assert(f.read_buffer().GetLength() == std::size_t(st.range(1)));
+
+    Aws::S3::Model::GetObjectRequest request;
+    request.SetBucket(f.bucket);
+    request.SetKey(f.key());
+    assert(st.range(0) >= st.range(1));
+    auto range_size = st.range(1);
+    auto bytes = range_size * sizeof(T);
+    auto dist = std::uniform_int_distribution<int64_t>(0, st.range(0) - range_size);
+    auto range_begin = dist(f.r_gen);
+    assert(range_begin >= 0);
+    assert(range_begin < int64_t(f.write_buffer().GetLength()));
+    auto range_end = range_begin + range_size;
+    assert(range_end > range_begin);
+    assert(range_end <= int64_t(f.write_buffer().GetLength()));
+
+    // Because a high-level API would totally ask you to build that string yourself.
+    // Oh wait, it's not a high-level API
+    auto range_str = std::string("bytes=") + std::to_string(range_begin * sizeof(T)) + "-" +
+                     std::to_string(range_end * sizeof(T));
+    request.SetRange(range_str);
+
+    request.SetResponseStreamFactory([&f, bytes]() {
+        return Aws::New<PreallocatedIOStream>(
+            "", reinterpret_cast<std::byte*>(f.read_buffer().GetUnderlyingData()), bytes);
+    });
+    Aws::S3::Model::GetObjectOutcome get_object_outcome = f.client.GetObject(request);
+    if (!get_object_outcome.IsSuccess())
+    {
+        auto err = get_object_outcome.GetError();
+        std::cerr << "Error reading object: " << err.GetExceptionName() << ": " << err.GetMessage()
+                  << std::endl;
+        throw std::runtime_error("S3 error");
+    }
+
+    // check
+
+    for (int64_t i = 0; i < st.range(1); i++)
+    {
+        if (f.read_buffer()[i] != f.write_buffer()[i + range_begin])
+        {
+            std::cerr << "Read data doesn't match\n";
+            throw std::runtime_error("read data doesn't match.");
+        }
+    }
+
+    //    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 constexpr auto range_multiplier = 2;
 constexpr auto range_min = 1ll;
-constexpr auto range_max = 1ll << 23;
+constexpr auto range_max = 1ll << 25;
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadSeekTimeValue, hta::TimeValue)(benchmark::State& st)
 {
@@ -422,7 +523,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WritePreallocTimeValue, hta::TimeVal
 {
     for (auto _ : st)
     {
-        write_preallocatedstreambuff(*this, st);
+        write_preallocatedstreambuf(*this, st);
     }
 }
 BENCHMARK_REGISTER_F(S3WriteFixture, WritePreallocTimeValue)
@@ -431,5 +532,36 @@ BENCHMARK_REGISTER_F(S3WriteFixture, WritePreallocTimeValue)
     ->Unit(benchmark::kMillisecond)
     ->RangeMultiplier(range_multiplier)
     ->Range(range_min, range_max);
+
+BENCHMARK_TEMPLATE_DEFINE_F(S3ReadRangeFixture, ReadRangeTimeValue, hta::TimeValue)
+(benchmark::State& st)
+{
+    for (auto _ : st)
+    {
+        read_range(*this, st);
+    }
+    st.SetBytesProcessed(st.range(1) * sizeof(hta::TimeValue) * st.iterations());
+}
+
+static void range_arguments(benchmark::internal::Benchmark* b)
+{
+    for (int64_t size = range_min; size <= range_max; size *= range_multiplier)
+    {
+        for (int64_t read_size : { 1, 64, 128 })
+        {
+            if (read_size >= size)
+            {
+                continue;
+            }
+            b->Args({ size, read_size });
+        }
+    }
+}
+BENCHMARK_REGISTER_F(S3ReadRangeFixture, ReadRangeTimeValue)
+    ->UseRealTime()
+    ->MeasureProcessCPUTime()
+    ->Unit(benchmark::kMillisecond)
+    ->RangeMultiplier(range_multiplier)
+    ->Apply(range_arguments);
 
 BENCHMARK_MAIN();
