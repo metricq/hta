@@ -133,13 +133,15 @@ protected:
 };
 
 template <class T>
-void write_stringstream(S3WriteFixture<T>& f, benchmark::State& st)
+void write_stringstream(S3WriteFixture<T>& f, [[maybe_unused]] benchmark::State& st)
 {
+    assert(int64_t(f.write_buffer().GetLength()) == st.range(0));
+    auto bytes = f.write_buffer().GetLength() * sizeof(T);
+
     auto data_stream = Aws::MakeShared<Aws::StringStream>(
         "PutObjectInputStream",
         std::stringstream::in | std::stringstream::out | std::stringstream::binary);
     // Not the greatest moment in programming history.
-    auto bytes = f.write_buffer().GetLength() * sizeof(T);
     data_stream->write(reinterpret_cast<char*>(f.write_buffer().GetUnderlyingData()), bytes);
 
     Aws::S3::Model::PutObjectRequest request;
@@ -158,22 +160,20 @@ void write_stringstream(S3WriteFixture<T>& f, benchmark::State& st)
                   << std::endl;
         throw std::runtime_error("S3 error");
     }
-
-    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 // Evil functions are inspired by https://github.com/aws/aws-sdk-cpp/issues/64
 // Apparently there is no proper way to get/put from S3 with zero copy.
 template <class T>
-void write_evil(S3WriteFixture<T>& f, benchmark::State& st)
+void write_evil(S3WriteFixture<T>& f, [[maybe_unused]] benchmark::State& st)
 {
+    assert(int64_t(f.write_buffer().GetLength()) == st.range(0));
+    auto bytes = f.write_buffer().GetLength() * sizeof(T);
+
     // Q: Why the fuck is this a shared pointer to a stream?
     // A: Because request.SetBody only accepts shared pointers.
     auto data_stream = Aws::MakeShared<Aws::StringStream>("PleaseBeNiceToMe");
 
-    // Not the greatest moment in programming history.
-
-    auto bytes = f.write_buffer().GetLength() * sizeof(T);
     data_stream->rdbuf()->pubsetbuf(reinterpret_cast<char*>(f.write_buffer().GetUnderlyingData()),
                                     bytes);
     data_stream->rdbuf()->pubseekpos(bytes);
@@ -195,14 +195,12 @@ void write_evil(S3WriteFixture<T>& f, benchmark::State& st)
                   << std::endl;
         throw std::runtime_error("S3 error");
     }
-
-    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 // This is why we need to endure Aws::Array
 // https://github.com/aws/aws-sdk-cpp/issues/785
 template <class T>
-void write_preallocatedstreambuf(S3WriteFixture<T>& f, benchmark::State& st)
+void write_preallocatedstreambuf(S3WriteFixture<T>& f, [[maybe_unused]] benchmark::State& st)
 {
     assert(int64_t(f.write_buffer().GetLength()) == st.range(0));
     auto bytes = f.write_buffer().GetLength() * sizeof(T);
@@ -226,8 +224,6 @@ void write_preallocatedstreambuf(S3WriteFixture<T>& f, benchmark::State& st)
                   << std::endl;
         throw std::runtime_error("S3 error");
     }
-
-    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 template <class T>
@@ -299,8 +295,6 @@ void read_seek(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
     }
     retrieved_file.seekg(0, std::ios::beg);
     retrieved_file.read(reinterpret_cast<char*>(f.read_buffer().GetUnderlyingData()), bytes);
-
-    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 template <class T>
@@ -329,8 +323,6 @@ void read_evil(S3ReadFixture<T>& f, [[maybe_unused]] benchmark::State& st)
                   << std::endl;
         throw std::runtime_error("S3 error");
     }
-
-    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 template <class T>
@@ -355,8 +347,6 @@ void read_preallocatedstreambuf(S3ReadFixture<T>& f, [[maybe_unused]] benchmark:
                   << std::endl;
         throw std::runtime_error("S3 error");
     }
-
-    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 template <class T>
@@ -437,13 +427,11 @@ void read_range(S3ReadRangeFixture<T>& f, [[maybe_unused]] benchmark::State& st)
             throw std::runtime_error("read data doesn't match.");
         }
     }
-
-    //    st.SetBytesProcessed(bytes + st.bytes_processed());
 }
 
 constexpr auto range_multiplier = 2;
 constexpr auto range_min = 1ll;
-constexpr auto range_max = 1ll << 25;
+constexpr auto range_max = 1ll << 27;
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadSeekTimeValue, hta::TimeValue)(benchmark::State& st)
 {
@@ -451,6 +439,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadSeekTimeValue, hta::TimeValue)(be
     {
         read_seek(*this, st);
     }
+    st.SetBytesProcessed(st.range(0) * sizeof(hta::TimeValue) * st.iterations());
 }
 BENCHMARK_REGISTER_F(S3ReadFixture, ReadSeekTimeValue)
     ->UseRealTime()
@@ -465,6 +454,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadEvilTimeValue, hta::TimeValue)(be
     {
         read_evil(*this, st);
     }
+    st.SetBytesProcessed(st.range(0) * sizeof(hta::TimeValue) * st.iterations());
 }
 BENCHMARK_REGISTER_F(S3ReadFixture, ReadEvilTimeValue)
     ->UseRealTime()
@@ -480,6 +470,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadPreallocTimeValue, hta::TimeValue
     {
         read_preallocatedstreambuf(*this, st);
     }
+    st.SetBytesProcessed(st.range(0) * sizeof(hta::TimeValue) * st.iterations());
 }
 BENCHMARK_REGISTER_F(S3ReadFixture, ReadPreallocTimeValue)
     ->UseRealTime()
@@ -495,6 +486,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteStringStreamTimeValue, hta::Tim
     {
         write_stringstream(*this, st);
     }
+    st.SetBytesProcessed(st.range(0) * sizeof(hta::TimeValue) * st.iterations());
 }
 BENCHMARK_REGISTER_F(S3WriteFixture, WriteStringStreamTimeValue)
     ->UseRealTime()
@@ -510,6 +502,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WriteEvilTimeValue, hta::TimeValue)
     {
         write_evil(*this, st);
     }
+    st.SetBytesProcessed(st.range(0) * sizeof(hta::TimeValue) * st.iterations());
 }
 BENCHMARK_REGISTER_F(S3WriteFixture, WriteEvilTimeValue)
     ->UseRealTime()
@@ -525,6 +518,7 @@ BENCHMARK_TEMPLATE_DEFINE_F(S3WriteFixture, WritePreallocTimeValue, hta::TimeVal
     {
         write_preallocatedstreambuf(*this, st);
     }
+    st.SetBytesProcessed(st.range(0) * sizeof(hta::TimeValue) * st.iterations());
 }
 BENCHMARK_REGISTER_F(S3WriteFixture, WritePreallocTimeValue)
     ->UseRealTime()
