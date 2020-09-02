@@ -541,7 +541,7 @@ static void range_arguments(benchmark::internal::Benchmark* b)
 {
     for (int64_t size = range_min; size <= range_max; size *= range_multiplier)
     {
-        for (int64_t read_size : { 1, 64, 128 })
+        for (int64_t read_size : { 1, 64, 65, 128 })
         {
             if (read_size >= size)
             {
