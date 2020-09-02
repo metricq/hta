@@ -431,7 +431,7 @@ void read_range(S3ReadRangeFixture<T>& f, [[maybe_unused]] benchmark::State& st)
 
 constexpr auto range_multiplier = 2;
 constexpr auto range_min = 1ll;
-constexpr auto range_max = 1ll << 27;
+constexpr auto range_max = 1ll << 28;
 
 BENCHMARK_TEMPLATE_DEFINE_F(S3ReadFixture, ReadSeekTimeValue, hta::TimeValue)(benchmark::State& st)
 {
