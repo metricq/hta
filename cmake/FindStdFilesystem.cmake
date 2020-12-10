@@ -51,17 +51,17 @@ CHECK_CXX_SYMBOL_EXISTS(std::experimental::filesystem::status_known experimental
 unset(CMAKE_REQUIRED_LIBRARIES)
 
 # source code for further checks
-if(HAS_EXPERIMENTAL_STD_FILESYSTEM)
+if(HAS_STD_FILESYSTEM)
+    set(_CHECK_FILESYSTEM_CODE_PREFIX "
+#include <filesystem>
+")
+else()
     set(_CHECK_FILESYSTEM_CODE_PREFIX "
 #include <experimental/filesystem>
 namespace std
 {
 using namespace experimental;
 }")
-else()
-    set(_CHECK_FILESYSTEM_CODE_PREFIX "
-#include <filesystem>
-")
 endif()
 set(_CHECK_FILESYSTEM_CODE "
 ${_CHECK_FILESYSTEM_CODE_PREFIX}
