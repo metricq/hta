@@ -1,6 +1,6 @@
 if(NOT TARGET json::json)
     add_library(json INTERFACE)
-    target_include_directories(json INTERFACE
+    target_include_directories(json SYSTEM INTERFACE
             $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
             $<INSTALL_INTERFACE:include>
     )
