@@ -1,4 +1,4 @@
-[![Build Status](https://travis-ci.com/metricq/hta.svg?branch=master)](https://travis-ci.com/metricq/hta)
+![Build](https://github.com/metricq/hta/workflows/Build/badge.svg)
 
 Hierarchical Timeline Aggregation
 =================================
