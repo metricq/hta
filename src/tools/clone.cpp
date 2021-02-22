@@ -85,7 +85,8 @@ int main(int argc, char* argv[])
     if (argc != 4 || argv[1] == std::string("--help") || argv[1] == std::string("-h"))
     {
         std::cout << argv[0] << " - a tool to copy hta metrics with new settings" << std::endl;
-        std::cout << "Usage: " << argv[0] << " config.json path_to_source_metric path_to_destiantion_metric" << std::endl;
+        std::cout << "Usage: " << argv[0]
+                  << " config.json path_to_source_metric path_to_destiantion_metric" << std::endl;
 
         return 0;
     }

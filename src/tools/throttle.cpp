@@ -55,7 +55,7 @@ json read_json_from_file(const std::filesystem::path& path)
 }
 
 void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_period,
-    hta::Duration chunk_interval=hta::duration_cast(std::chrono::hours(30 * 24)))
+                   hta::Duration chunk_interval = hta::duration_cast(std::chrono::hours(30 * 24)))
 {
     auto total_range = src.range();
     size_t read = 0, written = 0;
@@ -83,7 +83,7 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_pe
             {
                 previous_time = tv.time;
                 dst.insert(tv);
-                written ++;
+                written++;
             }
         }
     }
@@ -93,7 +93,8 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration cooldown_pe
 
 int main(int argc, char* argv[])
 {
-    if (argc != 5) {
+    if (argc != 5)
+    {
         std::cerr << "usage: hta_repair config.json source destination cooldown_ms\n";
         return -1;
     }
@@ -107,6 +108,5 @@ int main(int argc, char* argv[])
     hta::Directory directory(config);
 
     std::cout.imbue(std::locale(""));
-    throttle_copy(directory[src_name], directory[dst_name],
-                  cooldown);
+    throttle_copy(directory[src_name], directory[dst_name], cooldown);
 }

@@ -57,4 +57,4 @@ Aggregate& Aggregate::operator+=(Aggregate other)
     active_time += other.active_time;
     return *this;
 }
-}
+} // namespace hta

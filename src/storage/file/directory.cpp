@@ -74,7 +74,7 @@ std::unique_ptr<storage::Metric> Directory::open(const std::string& name, Mode m
 std::vector<std::string> Directory::metric_names()
 {
     std::vector<std::string> result;
-    for (const std::filesystem::path &path : std::filesystem::directory_iterator(directory_))
+    for (const std::filesystem::path& path : std::filesystem::directory_iterator(directory_))
     {
         if (std::filesystem::is_directory(path))
         {
