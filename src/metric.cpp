@@ -310,7 +310,7 @@ std::vector<Row> convert_timevalues_smooth(const std::vector<TimeValue>& raw_tvs
     {
         return rows;
     }
-    
+
     for (TimePoint current_begin = begin; current_begin < end; current_begin += interval)
     {
         assert(tv_it->time >= current_begin);
