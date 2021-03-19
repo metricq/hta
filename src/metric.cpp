@@ -301,7 +301,16 @@ std::vector<Row> convert_timevalues_smooth(const std::vector<TimeValue>& raw_tvs
     {
         previous_tp = tv_it->time;
     }
-
+    // Now, at least one is true:
+    // 1) tv_it->time >= begin
+    // 2) tv_it == tv_end
+    // let's exit early to ensure the asserted loop invariant 1)
+    // allowing this to return an empty dataset
+    if (tv_it == tv_end)
+    {
+        return rows;
+    }
+    
     for (TimePoint current_begin = begin; current_begin < end; current_begin += interval)
     {
         assert(tv_it->time >= current_begin);
