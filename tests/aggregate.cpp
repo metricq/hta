@@ -182,6 +182,45 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
             }
         }
 
+        SECTION("Medium intervals are handled correctly")
+        {
+            SECTION("both timestamps are aligned")
+            {
+                auto result = metric.aggregate(tp(110s), tp(130s));
+
+                CHECK(result.count == 20);
+                CHECK(result.minimum == 20);
+                CHECK(result.maximum == 20);
+                CHECK(result.mean_sum() == 20);
+                CHECK(result.mean_integral() == 20);
+                CHECK(result.active_time == hta::Duration(20s));
+            }
+
+            SECTION("end timestamp is not aligned and multiple raw between")
+            {
+                auto result = metric.aggregate(tp(110s), tp(125s));
+
+                CHECK(result.count == 15);
+                CHECK(result.minimum == 20);
+                CHECK(result.maximum == 20);
+                CHECK(result.mean_sum() == 20);
+                CHECK(result.mean_integral() == 20);
+                CHECK(result.active_time == hta::Duration(15s));
+            }
+
+            SECTION("begin timestamp is not aligned")
+            {
+                auto result = metric.aggregate(tp(115s), tp(130s));
+
+                CHECK(result.count == 15);
+                CHECK(result.minimum == 20);
+                CHECK(result.maximum == 20);
+                CHECK(result.mean_sum() == 20);
+                CHECK(result.mean_integral() == 20);
+                CHECK(result.active_time == hta::Duration(15s));
+            }
+        }
+
         SECTION("Tiny intervals are handled correctly")
         {
             SECTION("when containing one raw value")
