@@ -217,6 +217,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
             {
                 a += Aggregate(tv.value, tv.time - previous_time);
             }
+            previous_time = tv.time;
         }
     }
 
