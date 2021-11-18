@@ -61,6 +61,16 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
                           << std::endl;
                 continue;
             }
+            if (std::isnan(tv.value))
+            {
+                std::cout << "Dropping NaN at index " << (processed - 1) << std::endl;
+                continue;
+            }
+            if (std::isinf(tv.value))
+            {
+                std::cout << "Dropping infinity at index " << (processed - 1) << std::endl;
+                continue;
+            }
             previous_time = tv.time;
             dst.insert(tv);
         }
