@@ -167,7 +167,7 @@ Metric& Directory::operator[](const std::string& name)
             }
         }
     }
-    throw Exception(std::string("no settings found to create metric ") + name);
+    throw_exception<MissingMetricConfig>("no settings found to create metric ", name);
 }
 
 Directory::~Directory() = default;

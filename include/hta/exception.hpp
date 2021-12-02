@@ -43,6 +43,11 @@ struct Exception : std::runtime_error
     }
 };
 
+struct MissingMetricConfig : public Exception
+{
+    using Exception::Exception;
+};
+
 namespace detail
 {
 
@@ -68,13 +73,13 @@ namespace detail
     };
 } // namespace detail
 
-template <typename... Args>
-inline void throw_exception(Args... args)
+template <typename E = Exception, typename... Args>
+[[noreturn]] inline void throw_exception(Args... args)
 {
     std::stringstream msg;
 
     detail::make_exception<Args...>()(msg, args...);
 
-    throw Exception(msg.str());
+    throw E(msg.str());
 }
 } // namespace hta

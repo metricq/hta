@@ -71,6 +71,9 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
         hta::Directory dir(config_path);
         auto& metric = dir["foo"];
         metric.insert(test_sample);
+
+        // trying to get a metric without config fails
+        REQUIRE_THROWS_AS(dir["missing_config"], hta::MissingMetricConfig);
     }
 
     REQUIRE(std::filesystem::file_size(test_pwd / "foo" / "raw.hta") > 0);
