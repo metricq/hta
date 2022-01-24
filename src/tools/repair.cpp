@@ -42,33 +42,34 @@
 
 #include <cassert>
 
-void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval)
+void throttle_copy(hta::storage::file::Metric::RawFile& src, hta::Metric& dst, size_t chunk_size)
 {
-    auto total_range = src.range();
     size_t processed = 0;
     hta::TimePoint previous_time;
-    for (auto t0 = total_range.first; t0 <= total_range.second; t0 += chunk_interval)
+
+    std::vector<hta::TimeValue> read_buffer(chunk_size);
+    auto size = src.size();
+    for(size_t read_index = 0; read_buffer.size() == chunk_size; read_index += chunk_size)
     {
-        print_progress(static_cast<double>((t0 - total_range.first).count()) /
-                       (total_range.second - total_range.first).count());
-        auto data = src.retrieve(t0, t0 + chunk_interval, { hta::Scope::closed, hta::Scope::open });
-        for (auto tv : data)
+        print_progress(static_cast<double>(read_index) / size);
+        src.read(read_buffer, read_index);
+        for (auto tv : read_buffer)
         {
             processed++;
             if (tv.time <= previous_time)
             {
-                std::cout << "Non-Monotonic time " << tv.time << " at index " << (processed - 1)
+                std::cout << "Non-Monotonic time " << tv.time << " at read_index " << (processed - 1)
                           << std::endl;
                 continue;
             }
             if (std::isnan(tv.value))
             {
-                std::cout << "Dropping NaN at index " << (processed - 1) << std::endl;
+                std::cout << "Dropping NaN at read_index " << (processed - 1) << std::endl;
                 continue;
             }
             if (std::isinf(tv.value))
             {
-                std::cout << "Dropping infinity at index " << (processed - 1) << std::endl;
+                std::cout << "Dropping infinity at read_index " << (processed - 1) << std::endl;
                 continue;
             }
             previous_time = tv.time;
@@ -115,16 +116,22 @@ int main(int argc, char* argv[])
     std::filesystem::create_directory(src_folder);
 
     // open hta metrics
-    auto src_storage = std::make_unique<hta::storage::file::Metric>(
-        hta::storage::file::FileOpenTag::Read(), src_backup_folder);
+    hta::storage::file::Metric::RawFile src_raw_file(
+        hta::storage::file::FileOpenTag::Read(),
+        src_backup_folder / std::filesystem::path("raw.hta")
+    );
+    auto meta = hta::Meta(
+        hta::Duration(src_raw_file.header().interval_min),
+        hta::Duration(src_raw_file.header().interval_max),
+        src_raw_file.header().interval_factor
+    );
     auto dst_storage = std::make_unique<hta::storage::file::Metric>(
-        hta::storage::file::FileOpenTag::Write(), src_folder, src_storage->meta());
+        hta::storage::file::FileOpenTag::Write(), src_folder, meta);
 
-    hta::Metric src(std::move(src_storage));
     hta::Metric dst(std::move(dst_storage));
 
     std::cout.imbue(std::locale(""));
-    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)));
+    throttle_copy(src_raw_file, dst, 1024*1024);
 
     std::cout << std::endl;
 }
