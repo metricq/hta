@@ -42,7 +42,8 @@
 
 #include <cassert>
 
-void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval)
+void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval,
+                   bool transform_absolute)
 {
     auto total_range = src.range();
     size_t processed = 0;
@@ -71,6 +72,13 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
                 std::cout << "Dropping infinity at index " << (processed - 1) << std::endl;
                 continue;
             }
+
+            if (transform_absolute && tv.value < 0)
+            {
+                std::cout << "Use absolute of negative value at index " << (processed - 1) << "\n";
+                tv.value = -tv.value;
+            }
+
             previous_time = tv.time;
             dst.insert(tv);
         }
@@ -80,15 +88,18 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
 
 int main(int argc, char* argv[])
 {
-    if (argc != 2 || argv[1] == std::string("--help") || argv[1] == std::string("-h"))
+    if (argc < 2 || argc > 3 || (argc == 3 && argv[2] != std::string("--abs")) ||
+        argv[1] == std::string("--help") || argv[1] == std::string("-h"))
     {
         std::cout << argv[0] << " - a tool to repair hta metrics" << std::endl;
-        std::cout << "Usage: " << argv[0] << " path_to_metric_folder" << std::endl;
+        std::cout << "Usage: " << argv[0] << " path_to_metric_folder [--abs]" << std::endl;
 
         return 0;
     }
 
     auto src_folder = std::filesystem::path(argv[1]);
+
+    bool use_absolute = argc == 3 && argv[2] == std::string("--abs");
 
     if (!std::filesystem::exists(src_folder))
     {
@@ -124,7 +135,7 @@ int main(int argc, char* argv[])
     hta::Metric dst(std::move(dst_storage));
 
     std::cout.imbue(std::locale(""));
-    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)));
+    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)), use_absolute);
 
     std::cout << std::endl;
 }
