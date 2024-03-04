@@ -86,7 +86,7 @@ TEST_CASE("HTA file can basically be written and read.", "[hta]")
 
     {
         hta::Directory dir(config_path);
-        auto& metric = dir["foo"];
+        dir["foo"];
     }
     {
         hta::Directory dir(config_path);
