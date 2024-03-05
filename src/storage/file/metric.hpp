@@ -55,8 +55,8 @@ public: // for the dump tool
         Header() = default; // default C'tor for reading
 
         Header(Duration interval, Meta meta)
-        : version{ 2 }, interval{ interval.count() }, duration_period{ Duration::period::num,
-                                                                       Duration::period::den },
+        : version{ 2 }, interval{ interval.count() },
+          duration_period{ Duration::period::num, Duration::period::den },
           interval_min{ meta.interval_min.count() }, interval_factor{ meta.interval_factor },
           interval_max{ meta.interval_max.count() }
         {
