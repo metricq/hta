@@ -30,20 +30,24 @@
 
 #include "util.hpp"
 
+#include <exception>
 #include <hta/hta.hpp>
 #include <hta/ostream.hpp>
 
 #include "../storage/file/metric.hpp"
 
+#include <nitro/options/arguments.hpp>
+#include <nitro/options/parser.hpp>
+
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <locale>
-
-#include <cassert>
+#include <optional>
+#include <string>
 
 void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval,
-                   bool transform_absolute)
+                   bool transform_absolute, std::optional<double> drop_below,
+                   std::optional<double> drop_above)
 {
     auto total_range = src.range();
     size_t processed = 0;
@@ -72,6 +76,12 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
                 std::cout << "Dropping infinity at index " << (processed - 1) << std::endl;
                 continue;
             }
+            if ((drop_above && tv.value > *drop_above) ||
+                (drop_below && tv.value < *drop_below))
+            {
+                std::cout << "Dropping clamped value (" << tv.value << ") at index "
+                          << (processed - 1) << std::endl;
+            }
 
             if (transform_absolute && tv.value < 0)
             {
@@ -88,18 +98,64 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2 || argc > 3 || (argc == 3 && argv[2] != std::string("--abs")) ||
-        argv[1] == std::string("--help") || argv[1] == std::string("-h"))
-    {
-        std::cout << argv[0] << " - a tool to repair hta metrics" << std::endl;
-        std::cout << "Usage: " << argv[0] << " path_to_metric_folder [--abs]" << std::endl;
+    nitro::options::parser parser(argv[0], "a tool to repair hta metrics");
 
+    // accept the metric name as positional argument
+    parser.accept_positionals(1);
+    parser.positional_metavar("metric");
+
+    parser.toggle("abs", "replace all negative values with their absolute value");
+    parser.toggle("help", "show usage").short_name("h");
+
+    parser.option("drop-above", "drop all data points with a value larger than the given value")
+        .optional();
+    parser.option("drop-below", "drop all data points with a value lesser than the given value")
+        .optional();
+
+    nitro::options::arguments options;
+
+    try
+    {
+        options = parser.parse(argc, argv);
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "Failed to parse arguments: " << e.what() << std::endl;
+        parser.usage();
+
+        return 1;
+    }
+
+    if (options.given("help"))
+    {
+        parser.usage();
         return 0;
     }
 
-    auto src_folder = std::filesystem::path(argv[1]);
+    if (options.positionals().size() != 1)
+    {
+        std::cerr << "Exactly one metric is required." << std::endl;
+        parser.usage();
 
-    bool use_absolute = argc == 3 && argv[2] == std::string("--abs");
+        return 1;
+    }
+
+    std::optional<double> drop_above;
+    std::optional<double> drop_below;
+
+    if (options.provided("clamp-above"))
+    {
+        drop_above = std::stof(options.get("drop-above"));
+    }
+
+    if (options.provided("clamp-below"))
+    {
+        drop_below = std::stof(options.get("drop-below"));
+    }
+
+    auto src_folder = std::filesystem::path(options.positionals()[0]);
+
+    bool use_absolute = options.given("abs");
 
     if (!std::filesystem::exists(src_folder))
     {
@@ -112,7 +168,7 @@ int main(int argc, char* argv[])
     src_backup_folder +=
         ".backup-" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
 
-    // as the backup is tagged, this should pratically not happen
+    // as the backup is tagged, this should practically not happen
     if (std::filesystem::exists(src_backup_folder))
     {
         std::cerr << "The backup folder of the given hta metric already exists: "
@@ -135,7 +191,8 @@ int main(int argc, char* argv[])
     hta::Metric dst(std::move(dst_storage));
 
     std::cout.imbue(std::locale(""));
-    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)), use_absolute);
+    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)), use_absolute, drop_below,
+                  drop_above);
 
     std::cout << std::endl;
 }
