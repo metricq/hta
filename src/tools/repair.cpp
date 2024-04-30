@@ -115,8 +115,10 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
                           << (processed - 1) << std::endl;
                 continue;
             }
-            if (intervals_contain(drop_intervals, tv.time)) {
-                 std::cout << "Dropping timepoint" << tv.time.time_since_epoch().count() << " at index " << (processed - 1) << std::endl;
+            if (intervals_contain(drop_intervals, tv.time))
+            {
+                std::cout << "Dropping timepoint" << tv.time.time_since_epoch().count()
+                          << " at index " << (processed - 1) << std::endl;
                 continue;
             }
 
