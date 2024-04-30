@@ -28,6 +28,7 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "hta/chrono.hpp"
 #include "util.hpp"
 
 #include <exception>
@@ -36,6 +37,7 @@
 
 #include "../storage/file/metric.hpp"
 
+#include <nitro/lang/string.hpp>
 #include <nitro/options/arguments.hpp>
 #include <nitro/options/parser.hpp>
 
@@ -43,11 +45,42 @@
 #include <iostream>
 #include <locale>
 #include <optional>
+#include <stdexcept>
 #include <string>
+#include <utility>
+#include <vector>
+
+struct Interval
+{
+
+    Interval(const std::string& from, const std::string& to)
+    : from(hta::Duration(std::stoll(from))), to(hta::Duration(std::stoll(to)))
+    {
+    }
+
+    bool contains(hta::TimePoint t) const
+    {
+        return from <= t && t <= to;
+    }
+
+    hta::TimePoint from;
+    hta::TimePoint to;
+};
+
+bool intervals_contain(const std::vector<Interval>& intervals, hta::TimePoint t)
+{
+    for (const auto& interval : intervals)
+    {
+        if (interval.contains(t))
+            return true;
+    }
+
+    return false;
+}
 
 void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval,
                    bool transform_absolute, std::optional<double> drop_below,
-                   std::optional<double> drop_above)
+                   std::optional<double> drop_above, std::vector<Interval> drop_intervals)
 {
     auto total_range = src.range();
     size_t processed = 0;
@@ -76,11 +109,15 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
                 std::cout << "Dropping infinity at index " << (processed - 1) << std::endl;
                 continue;
             }
-            if ((drop_above && tv.value > *drop_above) ||
-                (drop_below && tv.value < *drop_below))
+            if ((drop_above && tv.value > *drop_above) || (drop_below && tv.value < *drop_below))
             {
                 std::cout << "Dropping clamped value (" << tv.value << ") at index "
                           << (processed - 1) << std::endl;
+                continue;
+            }
+            if (intervals_contain(drop_intervals, tv.time)) {
+                 std::cout << "Dropping timepoint" << tv.time.time_since_epoch().count() << " at index " << (processed - 1) << std::endl;
+                continue;
             }
 
             if (transform_absolute && tv.value < 0)
@@ -112,6 +149,11 @@ int main(int argc, char* argv[])
     parser.option("drop-below", "drop all data points with a value lesser than the given value")
         .optional();
 
+    parser
+        .multi_option("drop-interval", "drops all datapoints that are in the given closed interval")
+        .metavar("{FROM_TS}-{TO_TS}")
+        .optional();
+
     nitro::options::arguments options;
 
     try
@@ -137,6 +179,28 @@ int main(int argc, char* argv[])
         std::cerr << "Exactly one metric is required." << std::endl;
         parser.usage();
 
+        return 1;
+    }
+
+    std::vector<Interval> drop_intervals;
+
+    try
+    {
+        for (auto& line : options.get_all("drop-interval"))
+        {
+            auto splitted = nitro::lang::split(line, "-");
+            if (splitted.size() != 2)
+            {
+                throw std::runtime_error("cannot parse format: " + line);
+            }
+
+            drop_intervals.emplace_back(splitted[0], splitted[1]);
+        }
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "Failed to parse drop-interval: " << e.what() << std::endl;
+        parser.usage();
         return 1;
     }
 
@@ -192,7 +256,7 @@ int main(int argc, char* argv[])
 
     std::cout.imbue(std::locale(""));
     throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)), use_absolute, drop_below,
-                  drop_above);
+                  drop_above, drop_intervals);
 
     std::cout << std::endl;
 }
