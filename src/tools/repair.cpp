@@ -28,10 +28,9 @@
 // NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 // SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-#include "hta/chrono.hpp"
 #include "util.hpp"
 
-#include <exception>
+#include <hta/chrono.hpp>
 #include <hta/hta.hpp>
 #include <hta/ostream.hpp>
 
@@ -41,6 +40,7 @@
 #include <nitro/options/arguments.hpp>
 #include <nitro/options/parser.hpp>
 
+#include <exception>
 #include <filesystem>
 #include <iostream>
 #include <locale>
