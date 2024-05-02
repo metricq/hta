@@ -80,7 +80,7 @@ bool intervals_contain(const std::vector<Interval>& intervals, hta::TimePoint t)
 
 void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval,
                    bool transform_absolute, std::optional<double> drop_below,
-                   std::optional<double> drop_above, std::vector<Interval> drop_intervals)
+                   std::optional<double> drop_above, const std::vector<Interval>& drop_intervals)
 {
     auto total_range = src.range();
     size_t processed = 0;
@@ -209,12 +209,12 @@ int main(int argc, char* argv[])
     std::optional<double> drop_above;
     std::optional<double> drop_below;
 
-    if (options.provided("clamp-above"))
+    if (options.provided("drop-above"))
     {
         drop_above = std::stof(options.get("drop-above"));
     }
 
-    if (options.provided("clamp-below"))
+    if (options.provided("drop-below"))
     {
         drop_below = std::stof(options.get("drop-below"));
     }
