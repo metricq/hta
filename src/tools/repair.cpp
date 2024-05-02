@@ -157,10 +157,27 @@ int main(int argc, char* argv[])
         .optional();
 
     nitro::options::arguments options;
+    std::vector<Interval> drop_intervals;
 
     try
     {
         options = parser.parse(argc, argv);
+
+        if (options.positionals().size() != 1)
+        {
+            throw std::runtime_error("exactly one metric is required");
+        }
+
+        for (auto& line : options.get_all("drop-interval"))
+        {
+            auto splitted = nitro::lang::split(line, "-");
+            if (splitted.size() != 2)
+            {
+                throw std::runtime_error("cannot parse drop-interval: " + line);
+            }
+
+            drop_intervals.emplace_back(splitted[0], splitted[1]);
+        }
     }
     catch (std::exception& e)
     {
@@ -174,36 +191,6 @@ int main(int argc, char* argv[])
     {
         parser.usage();
         return 0;
-    }
-
-    if (options.positionals().size() != 1)
-    {
-        std::cerr << "Exactly one metric is required." << std::endl;
-        parser.usage();
-
-        return 1;
-    }
-
-    std::vector<Interval> drop_intervals;
-
-    try
-    {
-        for (auto& line : options.get_all("drop-interval"))
-        {
-            auto splitted = nitro::lang::split(line, "-");
-            if (splitted.size() != 2)
-            {
-                throw std::runtime_error("cannot parse format: " + line);
-            }
-
-            drop_intervals.emplace_back(splitted[0], splitted[1]);
-        }
-    }
-    catch (std::exception& e)
-    {
-        std::cerr << "Failed to parse drop-interval: " << e.what() << std::endl;
-        parser.usage();
-        return 1;
     }
 
     std::optional<double> drop_above;
