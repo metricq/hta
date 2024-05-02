@@ -30,20 +30,57 @@
 
 #include "util.hpp"
 
+#include <hta/chrono.hpp>
 #include <hta/hta.hpp>
 #include <hta/ostream.hpp>
 
 #include "../storage/file/metric.hpp"
 
+#include <nitro/lang/string.hpp>
+#include <nitro/options/arguments.hpp>
+#include <nitro/options/parser.hpp>
+
+#include <exception>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
 #include <locale>
+#include <optional>
+#include <stdexcept>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include <cassert>
+struct Interval
+{
+
+    Interval(const std::string& from, const std::string& to)
+    : from(hta::Duration(std::stoll(from))), to(hta::Duration(std::stoll(to)))
+    {
+    }
+
+    bool contains(hta::TimePoint t) const
+    {
+        return from <= t && t <= to;
+    }
+
+    hta::TimePoint from;
+    hta::TimePoint to;
+};
+
+bool intervals_contain(const std::vector<Interval>& intervals, hta::TimePoint t)
+{
+    for (const auto& interval : intervals)
+    {
+        if (interval.contains(t))
+            return true;
+    }
+
+    return false;
+}
 
 void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_interval,
-                   bool transform_absolute)
+                   bool transform_absolute, std::optional<double> drop_below,
+                   std::optional<double> drop_above, const std::vector<Interval>& drop_intervals)
 {
     auto total_range = src.range();
     size_t processed = 0;
@@ -72,6 +109,18 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
                 std::cout << "Dropping infinity at index " << (processed - 1) << std::endl;
                 continue;
             }
+            if ((drop_above && tv.value > *drop_above) || (drop_below && tv.value < *drop_below))
+            {
+                std::cout << "Dropping clamped value (" << tv.value << ") at index "
+                          << (processed - 1) << std::endl;
+                continue;
+            }
+            if (intervals_contain(drop_intervals, tv.time))
+            {
+                std::cout << "Dropping timepoint" << tv.time.time_since_epoch().count()
+                          << " at index " << (processed - 1) << std::endl;
+                continue;
+            }
 
             if (transform_absolute && tv.value < 0)
             {
@@ -88,18 +137,78 @@ void throttle_copy(hta::Metric& src, hta::Metric& dst, hta::Duration chunk_inter
 
 int main(int argc, char* argv[])
 {
-    if (argc < 2 || argc > 3 || (argc == 3 && argv[2] != std::string("--abs")) ||
-        argv[1] == std::string("--help") || argv[1] == std::string("-h"))
-    {
-        std::cout << argv[0] << " - a tool to repair hta metrics" << std::endl;
-        std::cout << "Usage: " << argv[0] << " path_to_metric_folder [--abs]" << std::endl;
+    nitro::options::parser parser(argv[0], "a tool to repair hta metrics");
 
+    // accept the metric name as positional argument
+    parser.accept_positionals(1);
+    parser.positional_metavar("metric");
+
+    parser.toggle("abs", "replace all negative values with their absolute value");
+    parser.toggle("help", "show usage").short_name("h");
+
+    parser.option("drop-above", "drop all data points with a value larger than the given value")
+        .optional();
+    parser.option("drop-below", "drop all data points with a value lesser than the given value")
+        .optional();
+
+    parser
+        .multi_option("drop-interval", "drops all datapoints that are in the given closed interval")
+        .metavar("{FROM_TS}-{TO_TS}")
+        .optional();
+
+    nitro::options::arguments options;
+    std::vector<Interval> drop_intervals;
+
+    try
+    {
+        options = parser.parse(argc, argv);
+
+        if (options.positionals().size() != 1)
+        {
+            throw std::runtime_error("exactly one metric is required");
+        }
+
+        for (auto& line : options.get_all("drop-interval"))
+        {
+            auto splitted = nitro::lang::split(line, "-");
+            if (splitted.size() != 2)
+            {
+                throw std::runtime_error("cannot parse drop-interval: " + line);
+            }
+
+            drop_intervals.emplace_back(splitted[0], splitted[1]);
+        }
+    }
+    catch (std::exception& e)
+    {
+        std::cerr << "Failed to parse arguments: " << e.what() << std::endl;
+        parser.usage();
+
+        return 1;
+    }
+
+    if (options.given("help"))
+    {
+        parser.usage();
         return 0;
     }
 
-    auto src_folder = std::filesystem::path(argv[1]);
+    std::optional<double> drop_above;
+    std::optional<double> drop_below;
 
-    bool use_absolute = argc == 3 && argv[2] == std::string("--abs");
+    if (options.provided("drop-above"))
+    {
+        drop_above = std::stof(options.get("drop-above"));
+    }
+
+    if (options.provided("drop-below"))
+    {
+        drop_below = std::stof(options.get("drop-below"));
+    }
+
+    auto src_folder = std::filesystem::path(options.positionals()[0]);
+
+    bool use_absolute = options.given("abs");
 
     if (!std::filesystem::exists(src_folder))
     {
@@ -112,7 +221,7 @@ int main(int argc, char* argv[])
     src_backup_folder +=
         ".backup-" + std::to_string(std::chrono::system_clock::now().time_since_epoch().count());
 
-    // as the backup is tagged, this should pratically not happen
+    // as the backup is tagged, this should practically not happen
     if (std::filesystem::exists(src_backup_folder))
     {
         std::cerr << "The backup folder of the given hta metric already exists: "
@@ -135,7 +244,8 @@ int main(int argc, char* argv[])
     hta::Metric dst(std::move(dst_storage));
 
     std::cout.imbue(std::locale(""));
-    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)), use_absolute);
+    throttle_copy(src, dst, hta::duration_cast(std::chrono::hours(1024)), use_absolute, drop_below,
+                  drop_above, drop_intervals);
 
     std::cout << std::endl;
 }
