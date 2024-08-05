@@ -405,7 +405,6 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
     auto created = std::filesystem::create_directories(test_pwd);
     REQUIRE(created);
 
-
     json config = {
         { "type", "file" },
         { "path", test_pwd },
@@ -430,9 +429,9 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
     {
         hta::Directory dir(config_path);
         auto& metric = dir["bar"];
-        metric.insert(hta::TimeValue{hta::TimePoint(1696102100s), 42});
-        metric.insert(hta::TimeValue{hta::TimePoint(1696112100s), 42});
-        metric.insert(hta::TimeValue{hta::TimePoint(1697112100s), 42});
+        metric.insert(hta::TimeValue{ hta::TimePoint(1696102100s), 42 });
+        metric.insert(hta::TimeValue{ hta::TimePoint(1696112100s), 42 });
+        metric.insert(hta::TimeValue{ hta::TimePoint(1697112100s), 42 });
     }
 
     {
@@ -478,7 +477,6 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             CHECK(response.active_time == 900s);
         }
-
 
         SECTION("second interval")
         {
