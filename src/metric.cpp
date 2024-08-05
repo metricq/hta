@@ -258,6 +258,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         }
 
         interval = next_interval;
+        begin = next_begin;
     }
     return a;
 }
