@@ -393,3 +393,121 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
         }
     }
 }
+
+TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
+{
+    // Unfortunately there are no portable unique temporary directory creation mechanisms
+    // Let's just do it in the build folder
+    // Also we don't clean up if a test fails - so we can inspect what the problem seems to be
+    auto test_pwd = std::filesystem::current_path() / "hta_aggregation.tmp";
+
+    std::filesystem::remove_all(test_pwd);
+    auto created = std::filesystem::create_directories(test_pwd);
+    REQUIRE(created);
+
+
+    json config = {
+        { "type", "file" },
+        { "path", test_pwd },
+        { "metrics",
+          {
+              { "bar",
+                {
+                    { "interval_min", 40000000000 },
+                    { "interval_max", 400000000000000 },
+                    { "interval_factor", 10 },
+                } },
+          } },
+    };
+
+    auto config_path = test_pwd / "config.json";
+    std::ofstream config_file;
+    config_file.exceptions(std::ios::badbit | std::ios::failbit);
+    config_file.open(config_path);
+    config_file << config;
+    config_file.close();
+
+    {
+        hta::Directory dir(config_path);
+        auto& metric = dir["bar"];
+        metric.insert(hta::TimeValue{hta::TimePoint(1696102100s), 42});
+        metric.insert(hta::TimeValue{hta::TimePoint(1696112100s), 42});
+        metric.insert(hta::TimeValue{hta::TimePoint(1697112100s), 42});
+    }
+
+    {
+        hta::Directory dir(config_path);
+        auto& metric = dir["bar"];
+
+        SECTION("first interval")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696111200000000000));
+            auto end = hta::TimePoint(hta::Duration(1696112100000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+
+        SECTION("first interval (+1, 0)")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696111300000000000));
+            auto end = hta::TimePoint(hta::Duration(1696112100000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+
+        SECTION("first interval (-1, 0)")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696111100000000000));
+            auto end = hta::TimePoint(hta::Duration(1696112100000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+
+        SECTION("first interval (+1, +1)")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696111300000000000));
+            auto end = hta::TimePoint(hta::Duration(1696112200000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+
+
+        SECTION("second interval")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696112100000000000));
+            auto end = hta::TimePoint(hta::Duration(1696113000000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+
+        SECTION("third interval")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696113000000000000));
+            auto end = hta::TimePoint(hta::Duration(1696113900000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+
+        SECTION("fourth interval")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696113900000000000));
+            auto end = hta::TimePoint(hta::Duration(1696114800000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == 900s);
+        }
+    }
+}
