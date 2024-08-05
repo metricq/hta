@@ -438,7 +438,17 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
         hta::Directory dir(config_path);
         auto& metric = dir["bar"];
 
-        SECTION("first interval")
+        SECTION("first interval exact")
+        {
+            auto begin = hta::TimePoint(hta::Duration(1696111200000000000));
+            auto end = hta::TimePoint(hta::Duration(1696112080000000000));
+
+            auto response = metric.aggregate(begin, end);
+
+            CHECK(response.active_time == end-begin);
+        }
+
+        SECTION("first interval end mismatch")
         {
             auto begin = hta::TimePoint(hta::Duration(1696111200000000000));
             auto end = hta::TimePoint(hta::Duration(1696112100000000000));
