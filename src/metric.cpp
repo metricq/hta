@@ -227,9 +227,9 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     while (true)
     {
         auto next_interval = interval * interval_factor_;
-        next_begin = interval_end(begin, next_interval);
+        next_begin = interval_end(begin - Duration(1), next_interval);
         assert(next_begin >= begin);
-        next_end = interval_begin(end, next_interval);
+        next_end = interval_begin(end + Duration(1), next_interval);
         assert(next_end <= end);
 
         if (next_interval > interval_max_ || next_begin >= next_end)
@@ -245,24 +245,30 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         }
 
         // add left aggregates
-        auto rows_left = storage_metric_->get(begin, next_begin, interval,
-                                              IntervalScope{ Scope::closed, Scope::open });
-        for (const auto& ta : rows_left)
+        if (begin < next_begin)
         {
-            a += ta.aggregate;
+            auto rows_left = storage_metric_->get(begin, next_begin, interval,
+                                                  IntervalScope{ Scope::closed, Scope::open });
+            for (const auto& ta : rows_left)
+            {
+                a += ta.aggregate;
+            }
+            begin = next_begin;
         }
 
         // add right aggregates
-        auto rows_right = storage_metric_->get(next_end, end, interval,
-                                               IntervalScope{ Scope::closed, Scope::open });
-        for (const auto& ta : rows_right)
+        if (end > next_end)
         {
-            a += ta.aggregate;
+            auto rows_right = storage_metric_->get(next_end, end, interval,
+                                                   IntervalScope{ Scope::closed, Scope::open });
+            for (const auto& ta : rows_right)
+            {
+                a += ta.aggregate;
+            }
+            end = next_end;
         }
 
         interval = next_interval;
-        begin = next_begin;
-        end = next_end;
     }
     return a;
 }
