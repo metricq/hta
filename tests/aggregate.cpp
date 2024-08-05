@@ -445,7 +445,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == end-begin);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("first interval end mismatch")
@@ -455,7 +455,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("first interval (+1, 0)")
@@ -465,7 +465,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("first interval (-1, 0)")
@@ -475,7 +475,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("first interval (+1, +1)")
@@ -485,7 +485,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("second interval")
@@ -495,7 +495,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("third interval")
@@ -505,7 +505,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
 
         SECTION("fourth interval")
@@ -515,7 +515,7 @@ TEST_CASE("HTA doesn't return wrong aggregate active_times.", "[hta]")
 
             auto response = metric.aggregate(begin, end);
 
-            CHECK(response.active_time == 900s);
+            CHECK(response.active_time == end - begin);
         }
     }
 }
