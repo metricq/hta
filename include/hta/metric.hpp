@@ -144,6 +144,8 @@ private: // read
     std::vector<Row> retrieve_raw_row(TimePoint begin, TimePoint end,
                                       IntervalScope scope = IntervalScope{ Scope::closed,
                                                                            Scope::extended });
+    Aggregate aggregate_raw(TimePoint begin, TimePoint end);
+    Aggregate aggregate_interval(TimePoint begin, TimePoint end, Duration interval);
 
 public: // write
     void insert(TimeValue tv);
