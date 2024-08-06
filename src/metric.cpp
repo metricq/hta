@@ -131,7 +131,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     begin = std::clamp(begin, r.first, r.second);
     // We always use the bounded end
     // except when checking whether a raw time point towards the end included
-    const auto unbounded_end = end;
+    const auto requested_end = end;
     end = std::clamp(end, r.first, r.second);
 
     auto interval = interval_min_;
@@ -151,7 +151,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         {
             assert(previous_time <= tv.time);
             // Use actual end here such that if requested end > data end, the point is included
-            if (tv.time >= unbounded_end)
+            if (tv.time >= requested_end)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = end - previous_time;
@@ -206,7 +206,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         for (auto tv : right_raw)
         {
             // Use actual end here such that if requested end > data end, the point is included
-            if (tv.time >= unbounded_end)
+            if (tv.time >= requested_end)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = end - previous_time;
@@ -228,8 +228,8 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     {
         auto next_interval = interval * interval_factor_;
         next_begin = interval_end(begin - Duration(1), next_interval);
-        assert(next_begin >= begin);
-        next_end = interval_begin(end + Duration(1), next_interval);
+        assert(begin <= next_begin);
+        next_end = interval_begin(end, next_interval);
         assert(next_end <= end);
 
         if (next_interval > interval_max_ || next_begin >= next_end)
