@@ -109,6 +109,54 @@ std::vector<TimeValue> Metric::retrieve(TimePoint begin, TimePoint end, Interval
     return storage_metric_->get(begin, end, scope);
 }
 
+Aggregate Metric::aggregate_raw(TimePoint begin, TimePoint end)
+{
+    Aggregate aggregate;
+    const auto raw =
+        storage_metric_->get(begin, end, IntervalScope{ Scope::closed, Scope::extended });
+    auto previous_time = begin;
+    for (auto tv : raw)
+    {
+        assert(previous_time <= tv.time);
+        if (tv.time >= end)
+        {
+            // We add this for the integral but the point isn't actually in
+            auto partial_duration = end - previous_time;
+            Aggregate partial_interval{
+                tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
+            };
+            aggregate += partial_interval;
+        }
+        else
+        {
+            aggregate += Aggregate(tv.value, tv.time - previous_time);
+        }
+        previous_time = tv.time;
+    }
+    return aggregate;
+}
+
+Aggregate Metric::aggregate_interval(TimePoint begin, TimePoint end, Duration interval)
+{
+    // We assume that timestamps provided are aligned and ordered
+    // to ensure that everything pieces together exactly
+    assert(begin.time_since_epoch().count() % interval.count() == 0);
+    assert(end.time_since_epoch().count() % interval.count() == 0);
+    assert(begin <= end);
+
+    Aggregate aggregate;
+    if (begin < end) // we can avoid creating empty vectors in this case
+    {
+        auto rows =
+            storage_metric_->get(begin, end, interval, IntervalScope{ Scope::closed, Scope::open });
+        for (const auto& r : rows)
+        {
+            aggregate += r.aggregate;
+        }
+    }
+    return aggregate;
+}
+
 Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
 {
     check_read();
@@ -131,96 +179,26 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     begin = std::clamp(begin, r.first, r.second);
     // We never consider anything after the last point in the data
     end = std::clamp(end, r.first, r.second);
+    [[maybe_unused]] const auto expected_active_time = end - begin;
 
     auto interval = interval_min_;
     auto next_begin = interval_end(begin - Duration(1), interval);
     auto next_end = interval_begin(end, interval);
 
-    Aggregate a;
-
     if (next_begin >= next_end)
     {
         // No need to go to any intervals or do any splits, just one raw chunk
-        auto raw =
-            storage_metric_->get(begin, end, IntervalScope{ Scope::closed, Scope::extended });
-
-        auto previous_time = begin;
-        for (auto tv : raw)
-        {
-            assert(previous_time <= tv.time);
-            // Use actual end here such that if requested end > data end, the point is included
-            if (tv.time >= end)
-            {
-                // We add this for the integral but the point isn't actually in
-                auto partial_duration = end - previous_time;
-                Aggregate partial_interval{
-                    tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
-                };
-                a += partial_interval;
-            }
-            else
-            {
-                a += Aggregate(tv.value, tv.time - previous_time);
-            }
-            previous_time = tv.time;
-        }
-        return a;
+        return aggregate_raw(begin, end);
     }
+
+    Aggregate a;
     assert(begin <= next_begin);
-    if (begin < next_begin)
-    {
-        // Add left raw side
-        auto left_raw = storage_metric_->get(begin, next_begin,
-                                             IntervalScope{ Scope::closed, Scope::extended });
+    a += aggregate_raw(begin, next_begin);
+    begin = next_begin;
 
-        auto previous_time = begin;
-        for (auto tv : left_raw)
-        {
-            assert(previous_time <= tv.time);
-            if (tv.time >= next_begin)
-            {
-                // We add this for the integral but the point isn't actually in
-                auto partial_duration = next_begin - previous_time;
-                Aggregate partial_interval{
-                    tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
-                };
-                a += partial_interval;
-            }
-            else
-            {
-                a += Aggregate(tv.value, tv.time - previous_time);
-            }
-            previous_time = tv.time;
-        }
-        begin = next_begin;
-    }
     assert(next_end <= end);
-    if (next_end < end)
-    {
-        // Add right raw side
-        auto right_raw =
-            storage_metric_->get(next_end, end, IntervalScope{ Scope::closed, Scope::extended });
-        auto previous_time = next_end;
-        for (auto tv : right_raw)
-        {
-            // Use actual end here such that if requested end > data end, the point is included
-            if (tv.time >= end)
-            {
-                // We add this for the integral but the point isn't actually in
-                auto partial_duration = end - previous_time;
-                Aggregate partial_interval{
-                    tv.value, tv.value, 0, 0, tv.value * partial_duration.count(), partial_duration
-                };
-                a += partial_interval;
-            }
-            else
-            {
-                a += Aggregate(tv.value, tv.time - previous_time);
-            }
-            previous_time = tv.time;
-        }
-        end = next_end;
-    }
+    a += aggregate_raw(next_end, end);
+    end = next_end;
 
     while (true)
     {
@@ -232,42 +210,23 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
 
         if (next_interval > interval_max_ || next_begin >= next_end)
         {
-            // Use contiguous block and end
-            auto rows = storage_metric_->get(begin, end, interval,
-                                             IntervalScope{ Scope::closed, Scope::open });
-            for (const auto& ta : rows)
-            {
-                a += ta.aggregate;
-            }
+            // Finally use the contiguous block
+            a += aggregate_interval(begin, end, interval);
             break;
         }
 
         // add left aggregates
-        if (begin < next_begin)
-        {
-            auto rows_left = storage_metric_->get(begin, next_begin, interval,
-                                                  IntervalScope{ Scope::closed, Scope::open });
-            for (const auto& ta : rows_left)
-            {
-                a += ta.aggregate;
-            }
-            begin = next_begin;
-        }
+        a += aggregate_interval(begin, next_begin, interval);
+        begin = next_begin;
 
         // add right aggregates
-        if (end > next_end)
-        {
-            auto rows_right = storage_metric_->get(next_end, end, interval,
-                                                   IntervalScope{ Scope::closed, Scope::open });
-            for (const auto& ta : rows_right)
-            {
-                a += ta.aggregate;
-            }
-            end = next_end;
-        }
+        a += aggregate_interval(next_end, end, interval);
+        end = next_end;
 
         interval = next_interval;
     }
+
+    assert(a.active_time == expected_active_time);
     return a;
 }
 
