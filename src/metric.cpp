@@ -129,9 +129,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
     // TODO We could further optimize requests from (before) the beginning of time by using the
     // incomplete intervals of upper levels rather than piecing together raw/low ones
     begin = std::clamp(begin, r.first, r.second);
-    // We always use the bounded end
-    // except when checking whether a raw time point towards the end included
-    const auto requested_end = end;
+    // We never consider anything after the last point in the data
     end = std::clamp(end, r.first, r.second);
 
     auto interval = interval_min_;
@@ -151,7 +149,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         {
             assert(previous_time <= tv.time);
             // Use actual end here such that if requested end > data end, the point is included
-            if (tv.time >= requested_end)
+            if (tv.time >= end)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = end - previous_time;
@@ -206,7 +204,7 @@ Aggregate Metric::aggregate(hta::TimePoint begin, hta::TimePoint end)
         for (auto tv : right_raw)
         {
             // Use actual end here such that if requested end > data end, the point is included
-            if (tv.time >= requested_end)
+            if (tv.time >= end)
             {
                 // We add this for the integral but the point isn't actually in
                 auto partial_duration = end - previous_time;

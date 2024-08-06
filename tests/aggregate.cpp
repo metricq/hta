@@ -170,10 +170,10 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                     "timestamp")
             {
                 auto result = metric.aggregate(tp(1s), tp(230s));
-                CHECK(result.count == 110);
+                CHECK(result.count == 109);
                 CHECK(result.minimum == -37);
                 CHECK(result.maximum == 45);
-                CHECK(result.sum == 1983.);
+                CHECK(result.sum == 1948.);
                 auto integral = (-36 * 10) + (-30 * 21) + (-20 * 6) + (-10 * 5) + (0 * 14) +
                                 (-10 * 13) + (20 * 119) + (31 * 4) + (35 * 14) + (45 * 2) +
                                 (35 * 6);
@@ -336,8 +336,8 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 auto result = metric.aggregate(tp(225s), tp(504s));
 
                 CHECK(result.active_time == 0s);
-                CHECK(result.count == 1);
-                CHECK(result.sum == 35);
+                CHECK(result.count == 0);
+                CHECK(result.sum == 0);
                 CHECK(result.minimum == 35.);
                 CHECK(result.maximum == 35.);
                 CHECK(result.integral == 0);
@@ -348,8 +348,8 @@ TEST_CASE("Metric aggregate interface works", "[hta]")
                 auto result = metric.aggregate(tp(225s - hta::Duration(1)), tp(504s));
 
                 CHECK(result.active_time == hta::Duration(1));
-                CHECK(result.count == 1);
-                CHECK(result.sum == 35);
+                CHECK(result.count == 0);
+                CHECK(result.sum == 0);
                 CHECK(result.minimum == 35);
                 CHECK(result.maximum == 35);
                 CHECK(result.integral == 35);
