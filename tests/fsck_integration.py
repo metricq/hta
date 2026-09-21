@@ -159,6 +159,26 @@ class Recovery(unittest.TestCase):
         with p.open('r+b') as f:
             f.truncate(p.stat().st_size - count)
 
+    def test_help_explains_actions_scope_and_examples(self):
+        before = snapshot(self.case)
+        result = run(FSCK, '--help')
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stderr, '')
+        for heading in ('What happens?', 'What is checked?', 'Options', 'Examples',
+                        'Before you start', 'Stopping'):
+            self.assertIn('\n' + heading + '\n', result.stdout)
+        for explanation in ('No database changes.', 'trust older records.',
+                            'writes to the database without --apply',
+                            'not the NAME.backup-DIGITS directories',
+                            'Stop all database writers', '--jobs 4 --apply',
+                            '--full --metric', '--rollback --metric'):
+            self.assertIn(explanation, result.stdout)
+        self.assertTrue(all(len(line) <= 79 for line in result.stdout.splitlines()))
+        short = run(FSCK, '-h')
+        self.assertEqual(short.returncode, 0, short.stderr)
+        self.assertEqual(short.stdout, result.stdout)
+        self.assertEqual(snapshot(self.case), before)
+
     def test_missing_tail_all_levels(self):
         for p in self.case.glob('*.hta'):
             if p.name != 'raw.hta':

@@ -749,26 +749,54 @@ int main(int argc, char** argv)
             }
             else if (arg == "--help" || arg == "-h")
             {
-                std::cout
-                    << "Usage: hta_fsck [--apply] [--full] [--jobs N] [--exclude NAME ...] "
-                       "HTA_DIRECTORY\n"
-                    << "       hta_fsck [--apply] [--full] --metric METRIC_DIRECTORY\n"
-                    << "       hta_fsck --rollback [--metric] DIRECTORY\n"
-                    << "Default: database directory. --metric explicitly selects one metric.\n"
-                    << "Default: read-only append-tail recovery plan. --full checks all records.\n"
-                    << "--jobs N (or -j N): 1..64 concurrent metrics, default 1.\n"
-                    << "SIGINT/SIGTERM: stop scheduling and finish active metrics; a second "
-                       "signal\n"
-                    << "exits immediately. A stopped run returns 128 + signal (130/143).\n"
-                    << "Terminal dry-runs show the per-level plan; --verbose also shows it with "
-                       "--apply.\n"
-                    << "Symlink paths are refused; use the real directory path.\n"
-                    << "Database mode skips NAME.backup-DIGITS entries and prints each skip.\n"
-                    << "Use --metric to explicitly check/repair one of these backups.\n"
-                    << "Healthy metrics are left unchanged. --exclude NAME skips other "
-                       "directories.\n"
-                    << "Stop all database writers first. --apply keeps original suffixes in each\n"
-                    << "metric's .hta-fsck-recovery; archive it before a subsequent repair.\n";
+                std::cout << R"(hta_fsck - check and repair an offline HTA database
+
+Usage: hta_fsck [OPTIONS] DIRECTORY
+
+What happens?
+  No action option   Check and show the proposed repairs. No database changes.
+  --apply            Perform the repairs. Healthy metrics are left unchanged.
+  --rollback         Undo a previous hta_fsck repair using its saved recovery
+                     files. This writes to the database without --apply.
+                     Do not combine with --apply or --full.
+
+What is checked?
+  By default, check file ends for incomplete writes; trust older records.
+  --full             Check all records, including old data. Can be much slower.
+                     Add --apply if you also want to repair what is found.
+
+Options
+  --metric           DIRECTORY is one metric with raw.hta, not a database.
+  --jobs N, -j N     Process N metrics at once (1-64; default: 1). Try 2 or 4.
+  --exclude NAME     Skip a database subdirectory. Repeat for more names:
+                     --exclude first --exclude second. Not valid with --metric.
+  --verbose, -v      Show per-file repair details on the terminal with --apply.
+  --help, -h         Show this help.
+
+Examples
+  Check a database, four metrics at a time (no database changes):
+    hta_fsck --jobs 4 /path/to/db
+  Repair that database:
+    hta_fsck --jobs 4 --apply /path/to/db
+  Check all records of a single metric (no database changes):
+    hta_fsck --full --metric /path/to/db/my.metric
+  Undo an hta_fsck repair of a single metric:
+    hta_fsck --rollback --metric /path/to/db/my.metric
+
+Before you start
+  Stop all database writers, even for a check without --apply.
+  Checks may need temporary disk space to calculate proposed repairs.
+  Use real paths, not symlinks. Database scans skip backup directories named
+  NAME.backup-DIGITS; use --metric to select one explicitly.
+  Repairs save the original changed data in each metric's .hta-fsck-recovery.
+  Keep this for --rollback; move it to an archive before a later, new repair.
+  --rollback uses these recovery files, not the NAME.backup-DIGITS directories.
+
+Stopping
+  Ctrl-C or SIGTERM: start no new metrics; finish those already running.
+  A second signal exits immediately and may leave repairs unfinished.
+  Exit status: 0 = success, 1 = failure, 130/143 = stopped by SIGINT/SIGTERM.
+)";
                 return 0;
             }
             else
