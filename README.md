@@ -210,6 +210,52 @@ parallel --jobs 4 --noswap --joblog fsck-jobs.log --results fsck-results \
 Check job exit codes and run the checker again before restarting the DB. If the
 goal is validation of all historical data, use `hta_fsck --full` as well.
 
+### Comparing backups with current raw data
+
+The read-only helper checks immediate `METRIC.backup-DIGITS` directories against
+their sibling `METRIC` directories (the naming scheme used by `hta_repair`):
+
+```bash
+python3 helpers/check_backups.py /path/to/database
+python3 helpers/check_backups.py /path/to/database --only-problems
+python3 helpers/check_backups.py /path/to/database --jsonl > backup-report.jsonl
+```
+
+No build or third-party Python packages are required. By default it checks raw
+headers, record counts, first/last timestamps and nine evenly spaced 4 KiB windows
+in the shared raw prefix, including its beginning and end. Thus even 100 GB files
+require only a few KiB of reads. `--samples N` increases sampling;
+`--full` compares **every byte of the shared raw prefix**, potentially reading
+hundreds of GB. Aggregation files are not compared.
+
+- `MATCH_SAMPLED` / `MATCH_FULL`: equal lengths and matching compared raw bytes.
+- `CURRENT_GROWN`: matching shared prefix, with additional current raw points.
+- `CURRENT_SHORTER`: current metric has fewer points than its backup; a repair
+  may have stopped early.
+- `DIFFERENT`: differing headers or raw bytes; intentional filtering by a repair
+  can also cause differences.
+- `PARTIAL`, `EMPTY_BACKUP`, `ERROR`, `CHANGED_DURING_CHECK`: incomplete tails,
+  empty backups, missing/unsupported files, or files modified during comparison
+  need attention. Partial tails are also mentioned alongside other problems.
+
+Each pair reports point counts, their difference and the two final timestamps;
+a summary goes to stderr. Exit status is 0 for matching/grown pairs, 1 if any
+pair needs attention, and 2 for invalid arguments or no matching backup folders.
+Paths are escaped for safe logs. Symlink metrics/raw files are refused.
+
+This is a plausibility check, **not proof that last week's backup was complete**:
+sampling can miss changes, and metrics without a backup directory are not checked.
+Even `--full` compares data, not the internal validity of every record. Use an
+offline database or stable filesystem snapshot for reliable results; detected
+concurrent modifications invalidate the comparison. The helper never changes
+file contents or repairs anything (filesystem access times may update on reads).
+
+Run the standalone synthetic helper tests with:
+
+```bash
+python3 -B -m unittest discover -s tests -p test_check_backups.py -v
+```
+
 ### Recovery regression tests
 
 From the metricq-db-hta repository root, configure with `BUILD_TESTING=ON`, then:
