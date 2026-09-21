@@ -48,6 +48,7 @@ add_test(hta.test_flex hta.test_flex)
 target_link_libraries(hta.test_flex PRIVATE hta::hta catch::catch json::json)
 
 find_package(benchmark QUIET)
+include(fsck.cmake)
 if (benchmark_FOUND)
     message(STATUS "Looking for google benchmark - found, will build benchmark tests.")
 

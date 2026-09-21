@@ -31,3 +31,5 @@ endif()
 add_executable(hta_repair repair.cpp)
 target_link_libraries(hta_repair PRIVATE hta::hta Nitro::options)
 
+add_executable(hta_fsck fsck.cpp)
+target_link_libraries(hta_fsck PRIVATE hta::hta)

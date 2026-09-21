@@ -30,6 +30,7 @@
 #pragma once
 
 #include "../directory.hpp"
+#include "format.hpp"
 
 #include <hta/exception.hpp>
 #include <hta/filesystem.hpp>
@@ -95,10 +96,8 @@ template <class HeaderType, class T>
 class File
 {
 private:
-    // NEVER EVER CHANGE THESE TWO LINES
-    static constexpr std::array<char, 8> magic_bytes = { 'H',        'T',  'A',        0x1a,
-                                                         char(0xc5), 0x2c, char(0xcc), 0x1d };
-    static constexpr uint64_t byte_order_mark = 0xf8f9fafbfcfdfeff;
+    static constexpr auto magic_bytes = format::magic;
+    static constexpr auto byte_order_mark = format::bom;
     static_assert(std::is_pod_v<HeaderType>, "HeaderType must be a POD.");
 
 public:
@@ -316,8 +315,7 @@ private:
     std::filesystem::path filename_;
     std::fstream stream_;
     // Apparently pos_type doesn't like to be constexpr m(
-    static constexpr size_type header_begin_ =
-        magic_bytes.size() + sizeof(byte_order_mark) + sizeof(uint64_t);
+    static constexpr size_type header_begin_ = format::header_begin;
     // Currently unsupported by code, but used in file format for future use
     static constexpr uint64_t alignment_ = 1;
     pos_type data_begin_;

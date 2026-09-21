@@ -64,3 +64,204 @@ To repair metrics in parallel based on the file created by ```check_db_directory
 cat <output file of corrupted metrics> | parallel --load 100% --noswap --jobs <parallel jobs count> --results <folder for stdout and stderr of parallel programs> --eta <path to hta_repair, e.g. ./build/hta_repair> <path to db directory>/{}
 ```
 
+### Fast offline recovery after an interrupted append: `hta_fsck`
+
+Stop the database and all other writers before running this tool. `hta_fsck`
+accepts the database directory and processes its immediate metric subdirectories
+sequentially. An individual metric directory requires **`--metric`**; there is
+no automatic layout detection. A `.hta` file in the database root is an error
+reported before any repair starts. Passing a database root with `--metric` fails
+because it has no `raw.hta`.
+In database mode, entries named `<metric>.backup-<digits>` are automatically
+skipped, matching the timestamped backups created by `hta_repair`. Each skip is
+printed as `Skipped backup directory`; skipped entries are neither opened nor
+included in progress/summary counts. This applies to checking, `--apply` and
+`--rollback`. The metric prefix and numeric suffix must both be nonempty.
+To intentionally check/repair/roll back one of these directories, address it
+directly with `--metric`. This also handles a real metric whose name happens to
+match the backup pattern.
+All other immediate subdirectories are checked, including names starting with
+`.hta-fsck-`. Use repeatable `--exclude NAME` for further exclusions (exact immediate
+directory names, database mode only). Every exclusion is printed; nonexistent
+exclusions are errors.
+For a database at the root of a dedicated volume, explicitly exclude the
+filesystem's `lost+found` directory with `--exclude lost+found`. It is not skipped
+by name: a real metric could have the same name.
+Symlink input paths (including symlink parent components) and non-skipped symlink
+entries discovered in a database are refused with an explicit error. Use the
+real path, or exclude an unwanted symlink entry with `--exclude NAME`; skipped
+backup entries and excluded symlinks are not followed, including dangling ones.
+A failure in one metric is reported and
+does not prevent the remaining metrics from being checked; the overall exit code
+is nonzero if any metric failed. It leaves complete raw records intact,
+removes an incomplete final raw record (1–15 bytes), and rebuilds affected
+aggregation suffixes from the surviving raw data. Invalid complete raw records
+are reported and refused, rather than silently discarded.
+The empty parent file opened by the normal writer is also recreated when missing;
+unused higher levels remain absent on healthy short metrics.
+
+```bash
+hta_fsck /path/to/db                       # Read-only plan for all metrics
+hta_fsck --apply /path/to/db                # Repair affected metrics
+hta_fsck --full /path/to/db                 # Also check older raw/aggregation records
+hta_fsck --full --apply /path/to/db
+hta_fsck --apply --metric /path/to/db/metric
+hta_fsck --apply --metric /path/to/db/metric.backup-12345  # Explicitly repair a backup
+hta_fsck --apply --exclude lost+found /mountpoint
+hta_fsck --apply --verbose --metric /path/to/db/metric
+```
+
+When stdout and stderr are terminals (and `TERM` is not `dumb`), completed
+metrics remain as a list with their result. Below them, two live lines show the
+current metric/phase and the overall progress bar with ETA. Processing remains
+sequential. The ETA is approximate: it weights metrics equally and accounts for
+phase/record progress within the current metric; differently sized metrics can
+make it fluctuate. The final bar indicates processing completion, not success:
+failed metrics remain marked `FAILED` and the exit status is nonzero.
+With redirected output or `TERM=dumb`, ordinary per-metric/per-level log lines
+are emitted without cursor movement or a live bar. Completed metric results and
+the final summary are printed in both modes.
+Terminal dry-runs retain the full per-level plan below each completed metric,
+above the live progress lines for the next metric. `--verbose` (or `-v`) also
+enables these details for terminal repair runs. Recovery/rollback journal hints
+are always printed, even in the compact terminal view.
+All output modes escape control bytes in paths/messages (for example, a newline
+becomes the two characters `\n`). Backslashes become `\\`; other nonprintable
+and non-ASCII bytes become `\xHH`. This prevents filenames from injecting extra
+log lines or terminal commands, including in exclusions and preflight errors.
+
+Healthy metrics are not rewritten: file bytes, sizes, inodes, modes and modification
+times (including the metric directory's modification time) are preserved. No
+staging or recovery files are created inside a healthy metric. Normal read access
+may update access times according to the filesystem's mount options.
+
+The default mode assumes an append-only failure: complete older records before
+the damaged suffix are trusted. It checks the last 4096 raw records, determines
+each level's expected length, and compares its last surviving complete aggregate
+against independently reconstructed data. It walks backwards through mismatches
+until a matching boundary is found. A changed lower interval invalidates the
+overlapping upper intervals. This is not a full integrity check: an isolated
+older corruption separated from the end by correct rows requires `--full`.
+Neither mode can detect a plausible but incorrect raw value without an external
+reference or checksum.
+
+Raw lookup uses the raw file directly, never the aggregation indexes. Sequential
+checks and rebuilds advance a raw cursor using block reads instead of starting
+a binary search for each interval. Backward suffix checks still use binary
+searches. Plain logs report raw record reads and block/probe read requests.
+Higher
+levels are reconstructed from smaller levels with the same summation order as
+normal insertion. Reads and writes use bounded buffers. Missing and truncated
+aggregation files can be rebuilt in full; a damaged/unsupported raw header is
+refused before any original file is modified. The implementation targets Linux
+and the native HTA v2 format; extended headers are not supported for raw files.
+
+Before the first original file is changed, replacement suffixes and backups of
+all affected original bytes are written and synced in `.hta-fsck-recovery` inside
+the metric directory. This requires space for both suffixes, not a copy of the
+whole raw file. There must still be free space available on the volume. An I/O
+failure while preparing replacements/backups leaves the original files unchanged.
+A failure during installation leaves a recovery journal; **do not start the DB**
+with a partially installed repair. Restore the exact previous bytes with:
+
+```bash
+hta_fsck --rollback --metric /path/to/db/metric
+```
+
+`--rollback /path/to/db` restores metrics with recovery journals. Metrics without
+journals are unchanged (exit 0), consistently in database and `--metric` modes.
+
+Rollback is only for an offline metric that has not received new data since the
+repair. It restores even the original incomplete bytes and removes aggregation
+files created by this repair. Backups are retained after success and rollback;
+before restoring any data, rollback durably records `rolling-back`. If rollback
+is interrupted, normal checks/repairs refuse the metric until `--rollback` is
+rerun successfully. Failure to persist the initial state leaves the repaired
+data untouched.
+After a completed rollback or repair,
+archive/move `.hta-fsck-recovery` before a subsequent repair of the same metric.
+Read-only checks are allowed with both `complete` and `rolled-back` journals.
+A repeated rollback of a `rolled-back` journal is a no-op, preserving both the
+data and journal. Only `prepared`/`rolling-back` states require finishing rollback
+before checking again; unknown states are refused explicitly.
+If another repair is needed, `--apply` reports that the old journal must be
+archived, before creating any staging directory or changing files. An unchanged
+metric can be checked/reapplied without altering its files.
+The directory lock prevents concurrent `hta_fsck` processes, but does not lock
+out the database writer. Interrupted preparation may leave `.hta-fsck-stage-*`
+directories; no original files were changed until the recovery journal exists.
+Subsequent runs warn about each orphan staging entry and retain it unchanged.
+Inspect/archive these entries before removing them to reclaim space; the tool
+does not automatically delete potential recovery data.
+
+The default and `--full` plans return 0 when preparation succeeds (including when
+repairs are needed), and 1 for an error. Plain logs report each level, extra records,
+and incomplete suffix bytes. Dry runs use temporary staging outside the metric
+only when replacements are needed. The final summary counts unchanged metrics,
+metrics needing repair (or repaired metrics with `--apply`), and failures.
+
+For multiple metrics, use the checker's list as before:
+
+```bash
+parallel --jobs 4 --noswap --joblog fsck-jobs.log --results fsck-results \
+    hta_fsck --apply --metric /path/to/db/{} :::: corrupted_metrics_TIMESTAMP
+```
+
+Check job exit codes and run the checker again before restarting the DB. If the
+goal is validation of all historical data, use `hta_fsck --full` as well.
+
+### Recovery regression tests
+
+From the metricq-db-hta repository root, configure with `BUILD_TESTING=ON`, then:
+
+```bash
+cmake --build build --target hta_fsck hta_repair hta_fsck_fixture hta_fsck_fault -j4
+ctest --test-dir build -R '^hta.fsck$' --output-on-failure
+```
+
+The tests generate synthetic metrics using the regular HTA writer, damage copies,
+and compare all resulting files using SHA-256 and byte equality against the real
+`hta_repair` applied to copies of the same damaged input. Only incomplete raw
+suffixes are normalized first in the `hta_repair` copy, because that tool cannot
+open a partial raw record. The suite includes every partial raw/aggregate record
+length, missing levels, malformed tails, propagation across levels, first-interval
+arithmetic, older corruption in full mode, idempotence, and exact rollback.
+For every aggregation level separately, one complete final row is removed and
+repaired in both fast/full modes. These cases check byte/hash equality with
+`hta_repair`, preservation of the entire surviving prefix, and unchanged raw
+and lower-level files including their metadata.
+One targeted regression drops thousands of raw points while leaving every
+aggregation file intact, with the surviving raw endpoint just before/after an
+upper-level interval boundary. Both fast/full modes and complete/partial raw
+tails must remove unclosed aggregate rows without shortening their `active_time`;
+only the first surviving row per level may have reduced `active_time`.
+It also checks byte/hash equality with normal insertion and `hta_repair`,
+preservation of the surviving raw prefix, and exact rollback of the damaged input.
+The common repair helper also checks the complete directory tree, preserves
+unrelated files and archived backups, validates journal contents against original
+and repaired suffixes, and checks repeat-run metadata/byte identity. Regression
+tests cover explicit directory modes, backup-name collisions, orphan staging,
+lock errors, streaming read budgets, and terminal/plain progress output via a PTY.
+Tests also cover post-rollback checks without archiving first, no-op repeated
+rollback, terminal dry-run plans/verbose output, symlink rejection, explicit
+`lost+found` exclusions, and control-character escaping in logs and the terminal.
+Empty and single-point metrics are compared against the normal writer instead:
+the legacy repair tool's progress calculation is undefined for a zero time range.
+A test-only preload library injects short writes, ENOSPC, and process termination
+during preparation/installation; production `hta_fsck` has no fault-injection hooks.
+
+When Valgrind is installed at CMake configuration time, a separate Memcheck test
+is available. It covers healthy files, database mode, full rebuilding, dependency
+propagation, malformed inputs and rollback, using `--leak-check=full`,
+`--track-origins=yes` and `--error-exitcode=97`:
+
+```bash
+ctest --test-dir build -R '^hta.fsck.valgrind$' --output-on-failure
+```
+
+Per-process XML reports and logs are retained in `build/fsck-valgrind/` for a
+root-project build. The harness rejects signal termination, reported memory/leak
+errors and missing/incomplete XML reports; expected tool failures must return
+exactly 1. A deliberately crashing fixture verifies that SIGSEGV cannot pass as
+an expected tool failure. Its intentional-error reports use the separate prefix
+`harness-expected-error.*`, while actual fsck reports use `hta_fsck.*`.
