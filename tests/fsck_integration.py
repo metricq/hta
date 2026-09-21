@@ -11,6 +11,7 @@ import random
 import re
 import select
 import shutil
+import signal
 import struct
 import subprocess
 import sys
@@ -49,9 +50,12 @@ def run(*args, valgrind=None):
         prefix = 'hta_fsck.' if args[0] == FSCK else 'harness-expected-error.'
         fd, report = tempfile.mkstemp(prefix=prefix, suffix='.xml', dir=logdir)
         os.close(fd)
-        args = (checked, '--tool=memcheck', '--leak-check=full',
-                '--show-leak-kinds=all', '--errors-for-leak-kinds=definite,indirect,possible',
-                '--track-origins=yes', '--error-exitcode=97',
+        tool = os.environ.get('HTA_FSCK_VALGRIND_TOOL', 'memcheck') if args[0] == FSCK else 'memcheck'
+        options = ('--leak-check=full', '--show-leak-kinds=all',
+                   '--errors-for-leak-kinds=definite,indirect,possible', '--track-origins=yes')
+        if tool == 'helgrind':
+            options = ('--suppressions=' + str(pathlib.Path(__file__).with_name('fsck_helgrind.supp')),)
+        args = (checked, '--tool=' + tool, *options, '--error-exitcode=97',
                 '--xml=yes', f'--xml-file={report}', f'--log-file={report}.log', *args)
     result = subprocess.run(args, text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
                             timeout=120 if checked else 30)
@@ -565,6 +569,202 @@ class Recovery(unittest.TestCase):
             self.assertLess(requests, 6 * ((count + 4095) // 4096) + 64)
             self.assertEqual(hashes(self.case), hashes(self.oracle))
 
+    def test_fast_tail_check_avoids_global_raw_probes(self):
+        result = run(FSCK, '--metric', str(self.case))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        requests = int(re.search(r'Raw read requests .*: (\d+)', result.stdout)[1])
+        records = int(re.search(r'Raw records read .*: (\d+)', result.stdout)[1])
+        self.assertLessEqual(requests, 5, result.stdout)
+        self.assertLessEqual(records, 8194, result.stdout)
+        self.assertIn('[unchanged]', result.stdout)
+
+    def test_parallel_modes_match_serial_bytes_and_group_complete_plans(self):
+        db = self.database()
+        serial = pathlib.Path(tempfile.mkdtemp(dir=self.root)) / 'db'
+        shutil.copytree(db, serial)
+        before = snapshot(db)
+        for jobs in (1, 2, 4):
+            result = run(FSCK, '--jobs', str(jobs), str(db))
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(snapshot(db), before)
+            self.assertIn('Summary: 2 unchanged, 2 need repair, 0 failed', result.stdout)
+            lines = result.stdout.splitlines()
+            for i, line in enumerate(lines):
+                if line.startswith(('[unchanged]', '[needs repair]')):
+                    # The whole plan follows its own completion marker atomically.
+                    self.assertTrue(lines[i + 1].startswith('raw.hta:'), result.stdout)
+                    self.assertTrue(lines[i + 7].startswith('Raw read requests'), result.stdout)
+        result = run(FSCK, '--jobs', '1', '--apply', str(serial))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        result = run(FSCK, '--jobs', '4', '--apply', str(db))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual({p: v[-1] for p, v in snapshot(db).items()},
+                         {p: v[-1] for p, v in snapshot(serial).items()})
+        after = snapshot(db)
+        for name in ('a.healthy', 'c.healthy', 'e.backup-12345'):
+            self.assertEqual({p: v for p, v in before.items() if p == name or p.startswith(name + '/')},
+                             {p: v for p, v in after.items() if p == name or p.startswith(name + '/')})
+        result = run(FSCK, '--jobs', '4', '--rollback', str(db))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        restored = snapshot(db)
+        for name, original in before.items():
+            if not (db / name).is_dir():
+                self.assertEqual(restored[name][-1], original[-1])
+
+    def test_parallel_failure_does_not_skip_other_metrics(self):
+        db = self.database()
+        (db / 'a.healthy' / 'raw.hta').write_bytes(b'broken')
+        result = run(FSCK, '--jobs', '3', '--apply', str(db))
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('Summary: 1 unchanged, 2 repaired, 1 failed', result.stdout)
+        self.assertEqual(hashes(db / 'b.damaged'), hashes(self.oracle))
+        self.assertEqual(hashes(db / 'd.damaged'), hashes(self.oracle))
+
+    def test_parallel_full_rebuild_matches_serial(self):
+        db = self.database()
+        # Exercise raw truncation, a complete missing bottom level and a bad
+        # aggregate header while other workers scan all records concurrently.
+        with (db / 'b.damaged' / 'raw.hta').open('r+b') as stream:
+            stream.truncate(HEADER + 17000 * 16 + 7)
+        (db / 'd.damaged' / '1000.hta').unlink()
+        with (db / 'd.damaged' / '100000.hta').open('r+b') as stream:
+            stream.write(b'BADMAGIC')
+        serial = pathlib.Path(tempfile.mkdtemp(dir=self.root)) / 'db'
+        shutil.copytree(db, serial)
+        for jobs, target in ((1, serial), (4, db)):
+            result = run(FSCK, '--jobs', str(jobs), '--full', '--apply', str(target))
+            self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual({p: v[-1] for p, v in snapshot(db).items()},
+                         {p: v[-1] for p, v in snapshot(serial).items()})
+        before = snapshot(db)
+        result = run(FSCK, '--jobs', '4', '--full', '--apply', str(db))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(snapshot(db), before)
+
+    def test_parallel_enospc_keeps_other_workers_and_rollback_working(self):
+        db = self.database()
+        before = snapshot(db)
+        result = subprocess.run([FSCK, '--jobs', '4', '--apply', str(db)],
+                     env=dict(os.environ, LD_PRELOAD=FAULT, FSCK_TEST_FAIL_SUFFIX='/1000.hta'),
+                     text=True, capture_output=True, timeout=30)
+        self.assertEqual(result.returncode, 1, result.stderr)
+        self.assertIn('Summary: 2 unchanged, 1 repaired, 1 failed', result.stdout)
+        self.assertEqual(hashes(db / 'd.damaged'), hashes(self.oracle))
+        result = run(FSCK, '--jobs', '4', '--rollback', str(db))
+        self.assertEqual(result.returncode, 0, result.stderr)
+        after = snapshot(db)
+        for name, original in before.items():
+            if not (db / name).is_dir():
+                self.assertEqual(after[name][-1], original[-1])
+
+    def test_jobs_arguments_are_bounded(self):
+        before = snapshot(self.case)
+        for value in ('0', '-1', '65', '1.5', '2x', '999999999999999999999999'):
+            result = run(FSCK, '--metric', '--jobs', value, str(self.case))
+            self.assertEqual(result.returncode, 1, result.stderr)
+            self.assertIn('--jobs requires', result.stderr)
+        self.assertEqual(run(FSCK, '--jobs').returncode, 1)
+        self.assertEqual(run(FSCK, '--metric', '-j', '64', str(self.case)).returncode, 0)
+        empty = pathlib.Path(tempfile.mkdtemp(dir=self.root))
+        self.assertEqual(run(FSCK, '--jobs', '4', str(empty)).returncode, 0)
+        self.assertEqual(snapshot(self.case), before)
+
+    def gated_database(self):
+        root = pathlib.Path(tempfile.mkdtemp(dir=self.root))
+        db, gate = root / 'db', root / 'gate'
+        db.mkdir()
+        gate.mkdir()
+        for index in range(7):
+            metric = db / f'metric-{index}'
+            shutil.copytree(self.clean, metric)
+            path = metric / '1000.hta'
+            with path.open('r+b') as stream:
+                stream.truncate(path.stat().st_size - ROW)
+        return db, gate
+
+    def wait_for_workers(self, process, gate, jobs):
+        deadline = time.monotonic() + 10
+        while len(list(gate.glob('ready-*'))) < jobs:
+            self.assertIsNone(process.poll(), 'worker process exited before rendezvous')
+            self.assertLess(time.monotonic(), deadline, 'workers did not execute concurrently')
+            time.sleep(0.01)
+        self.assertEqual(len(list(gate.glob('ready-*'))), jobs)
+
+    def wait_for_stop_message(self, process):
+        text = b''
+        deadline = time.monotonic() + 10
+        while b'finishing active metrics.' not in text:
+            self.assertLess(time.monotonic(), deadline, 'stop was not acknowledged')
+            if select.select([process.stderr], [], [], 0.1)[0]:
+                chunk = os.read(process.stderr.fileno(), 4096)
+                self.assertTrue(chunk, 'process exited before stop acknowledgement')
+                text += chunk
+        return text
+
+    def test_parallel_graceful_stop_finishes_active_and_preserves_queued(self):
+        for jobs, sig, apply, installing in ((1, signal.SIGINT, True, False),
+                                            (3, signal.SIGINT, True, False),
+                                            (3, signal.SIGTERM, True, False),
+                                            (3, signal.SIGINT, False, False),
+                                            (3, signal.SIGINT, True, True)):
+            with self.subTest(jobs=jobs, signal=sig, apply=apply, installing=installing):
+                db, gate = self.gated_database()
+                before = {p.name: snapshot(p) for p in db.iterdir()}
+                args = ['--apply'] if apply else []
+                env = dict(os.environ, LD_PRELOAD=FAULT, FSCK_TEST_GATE_DIR=str(gate))
+                if installing:
+                    env['FSCK_TEST_GATE_INSTALL'] = '1'
+                process = subprocess.Popen([FSCK, '--jobs', str(jobs), *args, str(db)],
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            env=env)
+                try:
+                    self.wait_for_workers(process, gate, jobs)
+                    process.send_signal(sig)
+                    self.wait_for_stop_message(process)
+                    (gate / 'release').touch()
+                    out, err = process.communicate(timeout=30)
+                    self.assertEqual(process.returncode, 128 + sig, err)
+                    self.assertIn(f'{7 - jobs} not started (interrupted)', out.decode())
+                    self.assertEqual(len(list(gate.glob('ready-*'))), jobs)
+                    active = {p.name[len('ready-'):] for p in gate.glob('ready-*')}
+                    for metric in db.iterdir():
+                        if apply and metric.name in active:
+                            self.assertEqual(hashes(metric), hashes(self.oracle))
+                            manifest = json.loads((metric / '.hta-fsck-recovery' / 'manifest.json').read_text())
+                            self.assertEqual(manifest['state'], 'complete')
+                        else:
+                            self.assertEqual(snapshot(metric), before[metric.name])
+                finally:
+                    if process.poll() is None:
+                        process.kill()
+                    process.communicate()
+
+    def test_second_signal_exits_with_recoverable_parallel_journals(self):
+        db, gate = self.gated_database()
+        before = {p.name: hashes(p) for p in db.iterdir()}
+        process = subprocess.Popen([FSCK, '--jobs', '2', '--apply', str(db)],
+                    stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                    env=dict(os.environ, LD_PRELOAD=FAULT, FSCK_TEST_GATE_DIR=str(gate),
+                             FSCK_TEST_GATE_INSTALL='1'))
+        try:
+            self.wait_for_workers(process, gate, 2)
+            process.send_signal(signal.SIGINT)
+            self.wait_for_stop_message(process)
+            process.send_signal(signal.SIGTERM)
+            out, err = process.communicate(timeout=10)
+            self.assertEqual(process.returncode, 143, err)
+            self.assertEqual(len(list(gate.glob('ready-*'))), 2)
+            check = run(FSCK, '--jobs', '2', str(db))
+            self.assertEqual(check.returncode, 1)
+            self.assertIn('unfinished recovery', check.stderr)
+            rollback = run(FSCK, '--jobs', '2', '--rollback', str(db))
+            self.assertEqual(rollback.returncode, 0, rollback.stderr)
+            self.assertEqual({p.name: hashes(p) for p in db.iterdir()}, before)
+        finally:
+            if process.poll() is None:
+                process.kill()
+            process.communicate()
+
     def test_flock_error_reports_errno_without_claiming_contention(self):
         before = snapshot(self.case)
         env = dict(os.environ, LD_PRELOAD=FAULT, FSCK_TEST_FLOCK_ERROR='1')
@@ -576,7 +776,7 @@ class Recovery(unittest.TestCase):
         self.assertNotIn('another fsck', result.stderr)
         self.assertEqual(snapshot(self.case), before)
 
-    def terminal_run(self, *args, term='xterm', width=100):
+    def terminal_run(self, *args, term='xterm', width=100, env=None, on_started=None):
         master, slave = pty.openpty()
         fcntl.ioctl(slave, termios.TIOCSWINSZ, struct.pack('HHHH', 25, width, 0, 0))
         # Use the same Valgrind XML checks as pipe-based tests when requested.
@@ -591,11 +791,13 @@ class Recovery(unittest.TestCase):
                        '--track-origins=yes', '--error-exitcode=97', '--xml=yes',
                        f'--xml-file={report}', f'--log-file={report}.log', *command]
         process = subprocess.Popen(command, stdout=slave, stderr=slave,
-                                   env=dict(os.environ, TERM=term))
+                                   env=dict(os.environ, TERM=term, **(env or {})))
         os.close(slave)
         output = bytearray()
         deadline = time.monotonic() + 120
         try:
+            if on_started:
+                on_started(process)
             while True:
                 self.assertLess(time.monotonic(), deadline, 'terminal process timed out')
                 if not select.select([master], [], [], 0.2)[0]:
@@ -618,6 +820,21 @@ class Recovery(unittest.TestCase):
         text = output.decode(errors='replace')
         check_process(subprocess.CompletedProcess(command, process.returncode, text, text), report)
         return process.returncode, text
+
+    def test_parallel_terminal_shows_multiple_active_metrics(self):
+        db, gate = self.gated_database()
+        def release(process):
+            self.wait_for_workers(process, gate, 3)
+            (gate / 'release').touch()
+        code, text = self.terminal_run('--jobs', '3', str(db),
+                                      env=dict(LD_PRELOAD=FAULT, FSCK_TEST_GATE_DIR=str(gate)),
+                                      on_started=release)
+        self.assertEqual(code, 0, text)
+        frames = re.findall(r'(?:Current:[^\r\n]*\r?\n){3}', text)
+        self.assertTrue(any(set(re.findall(r'Current: (metric-\d+)', frame)) ==
+                            {'metric-0', 'metric-1', 'metric-2'} for frame in frames), text)
+        self.assertEqual(text.count('[needs repair]'), 7)
+        self.assertIn('100% 7/7 ETA 0m 0s', text)
 
     def test_terminal_progress_completed_list_and_eta(self):
         db = self.database()

@@ -109,18 +109,42 @@ hta_fsck --apply --metric /path/to/db/metric
 hta_fsck --apply --metric /path/to/db/metric.backup-12345  # Explicitly repair a backup
 hta_fsck --apply --exclude lost+found /mountpoint
 hta_fsck --apply --verbose --metric /path/to/db/metric
+hta_fsck --jobs 4 /path/to/db               # Check up to four metrics concurrently
+hta_fsck --jobs 4 --apply /path/to/db       # Independent per-metric repairs
 ```
 
+`--jobs N` (or `-j N`) accepts 1–64 workers; the default is 1. A metric is always
+handled entirely by one worker, with its own buffers, staging directory and
+recovery journal. Try 2 or 4 workers to overlap I/O latency; more workers can
+increase seek contention on HDDs. Compare comparable, previously unread metrics,
+not repeated reads from the filesystem cache. CPU, memory, open file and temporary
+disk requirements grow with the number of active workers. A dry-run leaves the
+database unchanged but **does compute replacement suffixes into the system temp
+directory** when repairs are needed; it is not a metadata-only estimate.
+
+During metric processing, the first SIGINT (Ctrl-C) or SIGTERM stops dispatching
+new metrics and lets all already assigned metrics finish, including journal
+installation/rollback. The summary lists metrics not started; exit status is 130
+for SIGINT or 143 for SIGTERM, even if the active work completed successfully.
+A **second signal exits immediately** and can leave orphan staging directories
+or unfinished recovery journals. The usual recovery/rollback rules below then
+apply. Do not restart database writers until the tool has exited and any failed
+or unfinished recoveries have been resolved. Discovery before worker startup
+does not modify metrics and retains the usual immediate signal termination.
+
 When stdout and stderr are terminals (and `TERM` is not `dumb`), completed
-metrics remain as a list with their result. Below them, two live lines show the
-current metric/phase and the overall progress bar with ETA. Processing remains
-sequential. The ETA is approximate: it weights metrics equally and accounts for
-phase/record progress within the current metric; differently sized metrics can
+metrics remain as a list with their result, in completion order. Below them, live
+lines show the active metrics/phases and the overall progress bar with ETA. If
+the terminal is too short, additional active metrics are counted in an overflow
+line. The ETA is approximate: it weights metrics equally and accounts for
+phase/record progress within active metrics; differently sized metrics can
 make it fluctuate. The final bar indicates processing completion, not success:
 failed metrics remain marked `FAILED` and the exit status is nonzero.
 With redirected output or `TERM=dumb`, ordinary per-metric/per-level log lines
 are emitted without cursor movement or a live bar. Completed metric results and
-the final summary are printed in both modes.
+the final summary are printed in both modes. Each complete result/plan is printed
+as one block, without interleaving another worker's output. In plain logs a
+separate `[metric-path]` line also announces each metric as it starts.
 Terminal dry-runs retain the full per-level plan below each completed metric,
 above the live progress lines for the next metric. `--verbose` (or `-v`) also
 enables these details for terminal repair runs. Recovery/rollback journal hints
@@ -147,10 +171,13 @@ reference or checksum.
 
 Raw lookup uses the raw file directly, never the aggregation indexes. Sequential
 checks and rebuilds advance a raw cursor using block reads instead of starting
-a binary search for each interval. Backward suffix checks still use binary
-searches. Plain logs report raw record reads and block/probe read requests.
-Higher
-levels are reconstructed from smaller levels with the same summation order as
+a binary search for each interval. New/backward lookups first bracket the target
+from the cached raw tail, extending backwards exponentially only when needed;
+binary search stays inside that bracket. Thus a small end check need not probe
+the middle of a multi-GB raw file. Timestamp validation retains the previous
+record across block boundaries instead of repeatedly reloading adjacent blocks.
+Plain logs report raw record reads and block/probe read requests.
+Higher levels are reconstructed from smaller levels with the same summation order as
 normal insertion. Reads and writes use bounded buffers. Missing and truncated
 aggregation files can be rebuilt in full; a damaged/unsupported raw header is
 refused before any original file is modified. The implementation targets Linux
@@ -288,6 +315,14 @@ unrelated files and archived backups, validates journal contents against origina
 and repaired suffixes, and checks repeat-run metadata/byte identity. Regression
 tests cover explicit directory modes, backup-name collisions, orphan staging,
 lock errors, streaming read budgets, and terminal/plain progress output via a PTY.
+Parallel regressions compare complete serial/parallel result trees, preserve
+healthy metrics, test failure isolation/ENOSPC and serialize complete log plans.
+Test-only I/O rendezvous verify the worker limit and graceful SIGINT/SIGTERM
+draining without starting queued metrics, including during installation. A second
+signal test verifies subsequent journal rollback. PTY tests check simultaneous
+active metric lines. `hta.fsck.search` compares tail lookups against standard
+lower-bound, including duplicate timestamps, cache boundaries and virtual raw
+files above 100 GB up to uint64_t index limits, without allocating those files.
 Tests also cover post-rollback checks without archiving first, no-op repeated
 rollback, terminal dry-run plans/verbose output, symlink rejection, explicit
 `lost+found` exclusions, and control-character escaping in logs and the terminal.
@@ -311,3 +346,14 @@ errors and missing/incomplete XML reports; expected tool failures must return
 exactly 1. A deliberately crashing fixture verifies that SIGSEGV cannot pass as
 an expected tool failure. Its intentional-error reports use the separate prefix
 `harness-expected-error.*`, while actual fsck reports use `hta_fsck.*`.
+
+`hta.fsck.helgrind` checks concurrent dry-runs, repairs, full rebuilds, failure
+isolation and rollback; reports are retained in `build/fsck-helgrind/`:
+
+```bash
+ctest --test-dir build -R '^hta.fsck.helgrind$' --output-on-failure
+```
+
+Its narrow suppression covers only a glibc-internal condition-variable signal
+inside a timed wait. Application notifications and all data-race reports remain
+checked.

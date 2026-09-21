@@ -1,10 +1,14 @@
 // Offline recovery of append-only HTA files. See README.md for the trust boundary.
 #include "../storage/file/metric.hpp"
 #include "fsck_progress.hpp"
+#include "fsck_search.hpp"
 #include <algorithm>
 #include <array>
+#include <atomic>
 #include <cerrno>
 #include <cmath>
+#include <condition_variable>
+#include <csignal>
 #include <cstring>
 #include <fcntl.h>
 #include <filesystem>
@@ -14,10 +18,10 @@
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <sys/file.h>
+#include <thread>
 #include <unistd.h>
 #include <vector>
 
@@ -173,21 +177,11 @@ struct Records
         ++read_requests;
         return read_object<T>(file.fd, base + index * sizeof(T));
     }
-};
-
-uint64_t lower_bound(Records<TimeValue>& raw, TimePoint time)
-{
-    uint64_t left = 0, right = raw.count;
-    while (left < right)
+    uint64_t tail_begin() const
     {
-        auto middle = left + (right - left) / 2;
-        if (raw.probe(middle).time < time)
-            left = middle + 1;
-        else
-            right = middle;
+        return cache_begin < count && cache.size() == count - cache_begin ? cache_begin : count;
     }
-    return left;
-}
+};
 
 void validate_tv(TimeValue tv)
 {
@@ -201,10 +195,10 @@ struct RawCursor
     std::optional<TimePoint> next_begin;
     uint64_t index = 0;
 
-    uint64_t locate(Records<TimeValue>& raw, TimePoint begin)
+    uint64_t locate(Records<TimeValue>& raw, TimePoint begin, TimePoint first)
     {
         if (!next_begin || begin < *next_begin)
-            index = lower_bound(raw, begin);
+            index = begin <= first ? 0 : tail_lower_bound(raw, begin);
         else
             while (index < raw.count && raw.get(index).time < begin)
                 ++index;
@@ -217,7 +211,7 @@ Aggregate from_raw(Records<TimeValue>& raw, RawCursor& cursor, TimePoint first, 
 {
     Aggregate result;
     auto previous = std::max(begin, first);
-    auto index = cursor.locate(raw, begin);
+    auto index = cursor.locate(raw, begin, first);
     std::optional<TimePoint> previous_record;
     if (index)
         previous_record = raw.get(index - 1).time;
@@ -447,13 +441,17 @@ bool recover_metric(const fs::path& metric, bool apply, bool full, bool undo, Pr
     TimePoint first, last;
     if (count)
     {
-        validate_tv(raw.get(0));
-        first = raw.get(0).time;
-        last = raw.get(count - 1).time;
+        const auto first_record = raw.probe(0);
+        validate_tv(first_record);
+        first = first_record.time;
+        last = raw.probe(count - 1).time;
         require(last >= first && last.time_since_epoch().count() <=
                                      std::numeric_limits<int64_t>::max() - header.interval_max,
                 "invalid raw time range");
         auto start = full || count <= 4096 ? 0 : count - 4096;
+        TimePoint previous;
+        if (start)
+            previous = raw.get(start - 1).time;
         for (uint64_t i = start; i < count; ++i)
         {
             if (i % 4096 == 0)
@@ -461,7 +459,8 @@ bool recover_metric(const fs::path& metric, bool apply, bool full, bool undo, Pr
             auto tv = raw.get(i);
             validate_tv(tv);
             if (i)
-                require(raw.get(i - 1).time < tv.time, "non-monotonic raw timestamps");
+                require(previous < tv.time, "non-monotonic raw timestamps");
+            previous = tv.time;
         }
     }
     // Do not even create a temporary directory inside a healthy metric:
@@ -581,12 +580,14 @@ bool recover_metric(const fs::path& metric, bool apply, bool full, bool undo, Pr
         bool changed = rebuilt || missing_parent ||
                        (existed && (!good_header ||
                                     bytes != data_begin + level->expected * sizeof(TimeAggregate)));
-        std::ostringstream detail;
-        detail << name << ": keep " << level->keep << ", rebuild " << rebuilt << ", remove "
-               << (present > level->expected ? present - level->expected : 0) << " extra records, "
-               << (good_header ? (bytes - data_begin) % sizeof(TimeAggregate) : 0)
-               << " partial bytes" << (changed && !good_header ? ", replace header" : "");
-        progress.detail_line(detail.str());
+        // Avoid lazy shared locale-facet initialization in numeric ostreams.
+        progress.detail_line(
+            name + ": keep " + std::to_string(level->keep) + ", rebuild " +
+            std::to_string(rebuilt) + ", remove " +
+            std::to_string(present > level->expected ? present - level->expected : 0) +
+            " extra records, " +
+            std::to_string(good_header ? (bytes - data_begin) % sizeof(TimeAggregate) : 0) +
+            " partial bytes" + (changed && !good_header ? ", replace header" : ""));
         if (changed)
         {
             const auto offset = good_header ? data_begin + level->keep * sizeof(TimeAggregate) : 0;
@@ -670,11 +671,47 @@ bool backup_directory_name(const std::string& name)
                        [](char c) { return c >= '0' && c <= '9'; });
 }
 
+// Lock-free atomics and _exit are safe here; logging and cleanup stay outside
+// the handler. A second signal deliberately retains the emergency-exit option.
+static_assert(std::atomic<int>::is_always_lock_free);
+std::atomic<int> stop_signal{ 0 };
+extern "C" void request_shutdown(int signal)
+{
+    if (stop_signal.exchange(signal, std::memory_order_relaxed))
+        ::_exit(128 + signal);
+}
+
+struct SignalHandlers
+{
+    struct sigaction old_int{}, old_term{};
+    SignalHandlers()
+    {
+        struct sigaction action{};
+        action.sa_handler = request_shutdown;
+        sigemptyset(&action.sa_mask);
+        sigaddset(&action.sa_mask, SIGINT);
+        sigaddset(&action.sa_mask, SIGTERM);
+        action.sa_flags = SA_RESTART;
+        require(::sigaction(SIGINT, &action, &old_int) == 0, "cannot install SIGINT handler");
+        if (::sigaction(SIGTERM, &action, &old_term) != 0)
+        {
+            ::sigaction(SIGINT, &old_int, nullptr);
+            throw std::runtime_error("cannot install SIGTERM handler");
+        }
+    }
+    ~SignalHandlers()
+    {
+        ::sigaction(SIGINT, &old_int, nullptr);
+        ::sigaction(SIGTERM, &old_term, nullptr);
+    }
+};
+
 int main(int argc, char** argv)
 {
     try
     {
         bool apply = false, full = false, undo = false, single = false, verbose = false;
+        size_t jobs = 1;
         std::vector<std::string> excludes;
         fs::path input;
         for (int i = 1; i < argc; ++i)
@@ -690,6 +727,17 @@ int main(int argc, char** argv)
                 single = true;
             else if (arg == "--verbose" || arg == "-v")
                 verbose = true;
+            else if (arg == "--jobs" || arg == "-j")
+            {
+                require(i + 1 < argc, "--jobs requires an integer from 1 to 64");
+                const std::string value = argv[++i];
+                require(!value.empty() && value.size() <= 2 &&
+                            std::all_of(value.begin(), value.end(),
+                                        [](char c) { return c >= '0' && c <= '9'; }),
+                        "--jobs requires an integer from 1 to 64");
+                jobs = std::stoul(value);
+                require(jobs >= 1 && jobs <= 64, "--jobs requires an integer from 1 to 64");
+            }
             else if (arg == "--exclude")
             {
                 require(i + 1 < argc, "--exclude requires an immediate directory name");
@@ -702,11 +750,16 @@ int main(int argc, char** argv)
             else if (arg == "--help" || arg == "-h")
             {
                 std::cout
-                    << "Usage: hta_fsck [--apply] [--full] [--exclude NAME ...] HTA_DIRECTORY\n"
+                    << "Usage: hta_fsck [--apply] [--full] [--jobs N] [--exclude NAME ...] "
+                       "HTA_DIRECTORY\n"
                     << "       hta_fsck [--apply] [--full] --metric METRIC_DIRECTORY\n"
                     << "       hta_fsck --rollback [--metric] DIRECTORY\n"
                     << "Default: database directory. --metric explicitly selects one metric.\n"
                     << "Default: read-only append-tail recovery plan. --full checks all records.\n"
+                    << "--jobs N (or -j N): 1..64 concurrent metrics, default 1.\n"
+                    << "SIGINT/SIGTERM: stop scheduling and finish active metrics; a second "
+                       "signal\n"
+                    << "exits immediately. A stopped run returns 128 + signal (130/143).\n"
                     << "Terminal dry-runs show the per-level plan; --verbose also shows it with "
                        "--apply.\n"
                     << "Symlink paths are refused; use the real directory path.\n"
@@ -762,38 +815,109 @@ int main(int argc, char** argv)
             }
         }
         std::sort(metrics.begin(), metrics.end());
+        SignalHandlers signals;
         size_t changed = 0, unchanged = 0, failed = 0;
-        Progress progress(metrics.size(), verbose || (!apply && !undo));
-        for (const auto& metric : metrics)
-        {
-            progress.begin(metric.string());
-            try
+        const auto worker_count = std::min(jobs, metrics.size());
+        Progress progress(metrics.size(), verbose || (!apply && !undo),
+                          std::max<size_t>(1, worker_count));
+        std::mutex queue_mutex;
+        std::condition_variable start_condition, done_condition;
+        size_t next = 0, finished_workers = 0;
+        bool start = false, abort_start = false;
+        auto work = [&](size_t slot) {
+            auto local = progress.worker(slot);
             {
-                if (recover_metric(metric, apply, full, undo, progress))
+                std::unique_lock<std::mutex> guard(queue_mutex);
+                start_condition.wait(guard, [&] { return start; });
+                if (abort_start)
+                    return;
+            }
+            for (;;)
+            {
+                size_t index;
                 {
-                    ++changed;
-                    progress.finish(undo ? "rolled back" : apply ? "repaired" : "needs repair");
+                    std::lock_guard<std::mutex> guard(queue_mutex);
+                    if (stop_signal.load(std::memory_order_relaxed) || next == metrics.size())
+                        break;
+                    index = next++;
                 }
-                else
+                const auto& metric = metrics[index];
+                try
                 {
-                    ++unchanged;
-                    progress.finish("unchanged");
+                    local.begin(metric.string());
+                    const auto modified = recover_metric(metric, apply, full, undo, local);
+                    local.finish(modified ? (undo  ? "rolled back" :
+                                             apply ? "repaired" :
+                                                     "needs repair") :
+                                            "unchanged");
+                    std::lock_guard<std::mutex> guard(queue_mutex);
+                    if (modified)
+                        ++changed;
+                    else
+                        ++unchanged;
+                }
+                catch (const std::exception& error)
+                {
+                    local.finish("FAILED", error.what());
+                    std::lock_guard<std::mutex> guard(queue_mutex);
+                    ++failed;
                 }
             }
-            catch (const std::exception& error)
             {
-                ++failed;
-                progress.finish("FAILED", error.what());
+                std::lock_guard<std::mutex> guard(queue_mutex);
+                ++finished_workers;
+                done_condition.notify_one();
+            }
+        };
+        std::vector<std::thread> workers;
+        workers.reserve(worker_count);
+        try
+        {
+            for (size_t slot = 0; slot < worker_count; ++slot)
+                workers.emplace_back(work, slot);
+        }
+        catch (...)
+        {
+            // No worker may mutate a metric until all threads were created.
+            {
+                std::lock_guard<std::mutex> guard(queue_mutex);
+                abort_start = start = true;
+                start_condition.notify_all();
+            }
+            for (auto& worker : workers)
+                worker.join();
+            throw;
+        }
+        {
+            std::lock_guard<std::mutex> guard(queue_mutex);
+            start = true;
+            start_condition.notify_all();
+        }
+        {
+            std::unique_lock<std::mutex> guard(queue_mutex);
+            while (finished_workers < worker_count)
+            {
+                done_condition.wait_for(guard, std::chrono::milliseconds(100));
+                if (stop_signal.load(std::memory_order_relaxed))
+                    progress.request_stop();
             }
         }
+        for (auto& worker : workers)
+            worker.join();
+        const auto interrupted = stop_signal.load(std::memory_order_relaxed);
+        if (interrupted)
+            progress.request_stop();
+        progress.clear();
         std::cout << "Summary: " << unchanged << " unchanged, " << changed
                   << (undo  ? " rolled back, " :
                       apply ? " repaired, " :
                               " need repair, ")
-                  << failed << " failed\n"
-                  << std::flush;
+                  << failed << " failed";
+        if (interrupted)
+            std::cout << ", " << metrics.size() - next << " not started (interrupted)";
+        std::cout << '\n' << std::flush;
         progress.final_bar();
-        return failed ? 1 : 0;
+        return interrupted ? 128 + interrupted : failed ? 1 : 0;
     }
     catch (const std::exception& error)
     {

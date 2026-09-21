@@ -1,0 +1,11 @@
+# glibc's timed condition wait can signal internally without the application's
+# mutex. Suppress only that internal Dubious diagnostic, never data races or
+# notifications originating in the worker-pool code.
+{
+   glibc_internal_timed_wait_signal
+   Helgrind:Dubious
+   fun:pthread_cond_signal_WRK
+   fun:__pthread_cond_wait_common
+   fun:___pthread_cond_clockwait64
+   fun:pthread_cond_clockwait@@GLIBC_2.34
+}
